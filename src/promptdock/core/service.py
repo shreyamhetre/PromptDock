@@ -414,6 +414,11 @@ def _tag_row(session: Session, prompt: PromptRow, tag: str, *, for_update: bool 
 
 def _lock_or_create_tag(session: Session, prompt: PromptRow, tag: str) -> TagRow:
     _check_name(tag, "tag name", 100)
+    try:
+        return _tag_row(session, prompt, tag, for_update=True)
+    except TagNotFoundError:
+        pass
+    # Only insert when missing: an INSERT that hits the conflict still uses up an id.
     session.execute(
         pg_insert(TagRow)
         .values(prompt_id=prompt.id, name=tag)

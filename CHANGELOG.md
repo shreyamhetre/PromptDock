@@ -15,6 +15,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   deduplicated by content hash, variables extracted), get by version or tag, promote with
   eval gates (`force` needs a reason), undo-style rollback, eval results, tag audit log.
 - Row locking so concurrent promotes and version creation stay consistent.
+- Read-only views with names and version numbers instead of ids (migration `0003`):
+  `v_prompt_status`, `v_versions`, `v_tags`, `v_tag_history`, `v_eval_results`.
 
 ### Removed
 - `tags.is_protected` (migration `0002`).
