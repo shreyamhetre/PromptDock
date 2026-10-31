@@ -99,7 +99,6 @@ class Tag(Base):
     version_id: Mapped[int | None] = mapped_column(
         ForeignKey("prompt_versions.id", ondelete="RESTRICT")
     )
-    is_protected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     gate: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     updated_by: Mapped[str | None] = mapped_column(String(200))
     updated_at: Mapped[datetime] = mapped_column(

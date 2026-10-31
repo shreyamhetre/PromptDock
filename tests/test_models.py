@@ -48,7 +48,7 @@ def test_eval_result_matches_plan_example() -> None:
 @pytest.mark.parametrize("score", [float("nan"), float("inf"), "high"])
 def test_eval_result_rejects_bad_scores(score: object) -> None:
     with pytest.raises(ValidationError):
-        EvalResultIn(prompt="p", version=1, metric="m", score=score)  # type: ignore[arg-type]
+        EvalResultIn(prompt="p", version=1, metric="m", score=score)
 
 
 def test_eval_result_rejects_unknown_fields() -> None:

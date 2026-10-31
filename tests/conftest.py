@@ -2,8 +2,9 @@ import uuid
 from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture(scope="session")
@@ -28,3 +29,20 @@ def empty_db_url(postgres_url: str) -> Iterator[str]:
         with admin.connect() as conn:
             conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         admin.dispose()
+
+
+@pytest.fixture
+def engine(empty_db_url: str) -> Iterator[Engine]:
+    """Engine for a fresh database migrated to the latest schema."""
+    from promptdock.db import migrate
+
+    migrate.upgrade(empty_db_url)
+    eng = create_engine(empty_db_url)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def session(engine: Engine) -> Iterator[Session]:
+    with Session(engine) as s:
+        yield s

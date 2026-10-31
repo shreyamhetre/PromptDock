@@ -17,7 +17,7 @@ TagAction = Literal["promote", "rollback"]
 
 DEFAULT_TAGS: tuple[str, ...] = ("dev", "preprod", "prod")
 
-_NAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.\-]*$"
+NAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.\-]*$"
 
 
 class _Model(BaseModel):
@@ -109,9 +109,8 @@ class Gate(_Model):
 class Tag(_Model):
     id: int
     prompt: str
-    name: str = Field(pattern=_NAME_PATTERN, max_length=100)
+    name: str = Field(pattern=NAME_PATTERN, max_length=100)
     version: int | None = None
-    is_protected: bool = False
     gate: Gate | None = None
     updated_by: str | None = None
     updated_at: datetime
