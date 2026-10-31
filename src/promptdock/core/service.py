@@ -39,7 +39,7 @@ from promptdock.models import (
     EvalResult,
     EvalResultIn,
     Gate,
-    Prompt,
+    PromptInfo,
     PromptVersion,
     PromptVersionCreate,
     Tag,
@@ -60,7 +60,7 @@ def create_prompt(
     name: str,
     description: str | None = None,
     project: str = DEFAULT_PROJECT,
-) -> Prompt:
+) -> PromptInfo:
     """Create a prompt with the default tags (dev, preprod, prod), none pointing anywhere yet.
 
     The project is created if it does not exist.
@@ -86,11 +86,11 @@ def create_prompt(
     return _prompt_model(session.get_one(PromptRow, inserted), project)
 
 
-def get_prompt(session: Session, name: str, project: str = DEFAULT_PROJECT) -> Prompt:
+def get_prompt(session: Session, name: str, project: str = DEFAULT_PROJECT) -> PromptInfo:
     return _prompt_model(_prompt_row(session, name, project), project)
 
 
-def list_prompts(session: Session, project: str = DEFAULT_PROJECT) -> list[Prompt]:
+def list_prompts(session: Session, project: str = DEFAULT_PROJECT) -> list[PromptInfo]:
     rows = session.scalars(
         select(PromptRow)
         .join(ProjectRow, PromptRow.project_id == ProjectRow.id)
@@ -480,8 +480,8 @@ def _template_json(template: Template) -> Any:
     return [message.model_dump() for message in template]
 
 
-def _prompt_model(row: PromptRow, project: str) -> Prompt:
-    return Prompt(
+def _prompt_model(row: PromptRow, project: str) -> PromptInfo:
+    return PromptInfo(
         id=row.id,
         project=project,
         name=row.name,

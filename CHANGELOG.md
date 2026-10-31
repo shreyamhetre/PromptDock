@@ -17,6 +17,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Row locking so concurrent promotes and version creation stay consistent.
 - Read-only views with names and version numbers instead of ids (migration `0003`):
   `v_prompt_status`, `v_versions`, `v_tags`, `v_tag_history`, `v_eval_results`.
+- `Client` (library mode): `get_prompt` by tag, version or latest returning a `Prompt`
+  with `.render(**values)`, `.version` and `.model_config`; methods for versions, tags,
+  gates, eval results and history.
+- Sandboxed Jinja2 rendering; `MissingVariableError` names every missing variable.
+- Cache: 60 s TTL for tag lookups, versions cached forever; last-known-good fallback
+  when the database is down, optional snapshot file for cold starts.
+- `examples/app.py` and `examples/tag.py`.
+
+### Changed
+- The metadata model `Prompt` is now `PromptInfo`; `Prompt` is the renderable object.
 
 ### Removed
 - `tags.is_protected` (migration `0002`).

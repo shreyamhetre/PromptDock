@@ -61,3 +61,11 @@ class GateFailedError(PromptDockError):
 
 class NothingToRollBackError(PromptDockError):
     """The tag has no earlier version to roll back to."""
+
+
+class MissingVariableError(InvalidInputError):
+    """``render()`` was called without values for some template variables."""
+
+    def __init__(self, missing: list[str]) -> None:
+        self.missing = missing
+        super().__init__(f"Missing template variables: {', '.join(missing)}")

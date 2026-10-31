@@ -42,7 +42,7 @@ class Project(_Model):
     created_at: datetime
 
 
-class Prompt(_Model):
+class PromptInfo(_Model):
     id: int
     project: str = DEFAULT_PROJECT
     name: str
