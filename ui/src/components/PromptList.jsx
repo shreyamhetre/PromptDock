@@ -1,63 +1,92 @@
 import { useEffect, useState } from "react";
 import { api, p } from "../api.js";
 import { useApi } from "../useApi.js";
-import { ErrorNotice } from "./common.jsx";
+import { ErrorNotice, STAGES, TagPill, timeAgo, versionLabel } from "./common.jsx";
 
 export default function PromptList() {
-  const { data: prompts, error, loading } = useApi("/prompts");
-  const [tags, setTags] = useState({});
+  const { data: prompts, error } = useApi("/prompts");
+  const [details, setDetails] = useState({});
 
   useEffect(() => {
     if (!prompts) return;
     Promise.all(
       prompts.map((prompt) =>
-        api(`${p(prompt.name)}/tags`).then((list) => [prompt.name, list]),
+        Promise.all([api(`${p(prompt.name)}/tags`), api(`${p(prompt.name)}/versions`)]).then(
+          ([tags, versions]) => [prompt.name, { tags, versions }],
+        ),
       ),
-    ).then((pairs) => setTags(Object.fromEntries(pairs)), () => {});
+    ).then((pairs) => setDetails(Object.fromEntries(pairs)), () => {});
   }, [prompts]);
 
   if (error) return <ErrorNotice error={error} />;
-  if (loading && !prompts) return <p className="muted">Loading…</p>;
 
+  const open = (name) => (window.location.hash = `#/p/${encodeURIComponent(name)}`);
   return (
     <>
-      <h1>Prompts</h1>
-      <p className="subtle">Click a prompt to see its versions, tags, scores and history.</p>
-      {prompts.length === 0 ? (
-        <div className="card">
-          No prompts yet. Create some from the terminal: <code>promptdock push ./prompts</code>
+      <div className="page-head">
+        <div>
+          <h1>Prompts</h1>
+          <p>Versioned prompts and where each environment points.</p>
         </div>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Description</th>
-              <th>Tags</th>
-            </tr>
-          </thead>
-          <tbody>
-            {prompts.map((prompt) => (
-              <tr
-                key={prompt.id}
-                className="clickable"
-                onClick={() => (window.location.hash = `#/p/${encodeURIComponent(prompt.name)}`)}
-              >
-                <td>
-                  <a href={`#/p/${encodeURIComponent(prompt.name)}`}>{prompt.name}</a>
-                </td>
-                <td className="subtle">{prompt.description || ""}</td>
-                <td>
-                  {(tags[prompt.name] || []).map((tag) => (
-                    <span className="chip" key={tag.name}>
-                      {tag.name} <strong>{tag.version ? `v${tag.version}` : "–"}</strong>
-                    </span>
-                  ))}
-                </td>
+      </div>
+      <div className="panel">
+        {!prompts ? (
+          <div className="panel-body">
+            <div className="skeleton" />
+          </div>
+        ) : prompts.length === 0 ? (
+          <div className="empty">
+            <strong>No prompts yet</strong>
+            Create some from the terminal with <code>promptdock push ./prompts</code>.
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Prompt</th>
+                {STAGES.map((stage) => (
+                  <th key={stage}>{stage}</th>
+                ))}
+                <th className="right">Versions</th>
+                <th className="right">Updated</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {prompts.map((prompt) => {
+                const d = details[prompt.name];
+                const byName = Object.fromEntries((d?.tags || []).map((t) => [t.name, t]));
+                const latest = d?.versions?.[d.versions.length - 1];
+                return (
+                  <tr key={prompt.id} className="clickable" onClick={() => open(prompt.name)}>
+                    <td>
+                      <a href={`#/p/${encodeURIComponent(prompt.name)}`} style={{ fontWeight: 600 }}>
+                        {prompt.name}
+                      </a>
+                      {prompt.description && <div className="muted">{prompt.description}</div>}
+                    </td>
+                    {STAGES.map((stage) => (
+                      <td key={stage} className="mono">
+                        {byName[stage]?.version ? (
+                          versionLabel(byName[stage].version)
+                        ) : (
+                          <span className="faint">–</span>
+                        )}
+                      </td>
+                    ))}
+                    <td className="right num">{d ? d.versions.length : ""}</td>
+                    <td className="right muted nowrap">{latest ? timeAgo(latest.created_at) : ""}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {prompts && prompts.length > 0 && (
+        <p className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>
+          Legend: <TagPill name="dev" /> <TagPill name="preprod" /> <TagPill name="prod" /> — apps
+          read a tag; promoting or rolling back changes what they get, with no code change.
+        </p>
       )}
     </>
   );

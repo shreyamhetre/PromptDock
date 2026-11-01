@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" alt="PromptDock logo" width="88" height="88">
+<img src="https://raw.githubusercontent.com/shreyamhetre/PromptDock/main/docs/assets/logo.svg" alt="PromptDock logo" width="88" height="88">
 
 # PromptDock
 
@@ -87,9 +87,9 @@ response = llm.chat.completions.create(messages=messages, **prompt.model_config)
 ```
 
 `render()` raises `MissingVariableError` naming any variable you forgot. Ready-to-run
-examples for [OpenAI](examples/openai_app.py), [Anthropic](examples/anthropic_app.py),
-[LangChain](examples/langchain_app.py) and an [LLM-as-judge eval script](examples/push_evals_llm_judge.py)
-are in [`examples/`](examples/).
+examples for [OpenAI](https://github.com/shreyamhetre/PromptDock/blob/main/examples/openai_app.py), [Anthropic](https://github.com/shreyamhetre/PromptDock/blob/main/examples/anthropic_app.py),
+[LangChain](https://github.com/shreyamhetre/PromptDock/blob/main/examples/langchain_app.py) and an [LLM-as-judge eval script](https://github.com/shreyamhetre/PromptDock/blob/main/examples/push_evals_llm_judge.py)
+are in [`examples/`](https://github.com/shreyamhetre/PromptDock/tree/main/examples/).
 
 ### Ways to run it
 
@@ -227,9 +227,9 @@ if you run one, your own PromptDock server.
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests and the
+Contributions are welcome — see [CONTRIBUTING.md](https://github.com/shreyamhetre/PromptDock/blob/main/CONTRIBUTING.md) for setup, tests and the
 release process.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/shreyamhetre/PromptDock/blob/main/LICENSE)

@@ -1,17 +1,26 @@
 [project]
 name = "promptdock"
-version = "0.1.0"
+version = "0.1.1"
 description = "Focused prompt versioning: immutable versions, movable tags, eval-gated promotion."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
+keywords = ["prompts", "prompt-management", "llm", "versioning", "evals", "mlops"]
 authors = [
     { name = "Shreya Mhetre" },
     { name = "Parth" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
     "Operating System :: OS Independent",
     "Development Status :: 3 - Alpha",
 ]

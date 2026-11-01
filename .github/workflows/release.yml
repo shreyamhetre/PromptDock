@@ -1,8 +1,18 @@
-name: Release
+# ---------------------------------------------------------------------------------------
+# Release
+#
+# Push a version tag (e.g. `git tag v0.1.1 && git push origin v0.1.1`) to publish it:
+#
+#   1. Test            the full CI suite (lint, types, Python 3.10-3.13 x Postgres 14/17)
+#   2. Build           dashboard + wheel and sdist; checks the tag matches pyproject.toml
+#   3. PyPI            Trusted Publishing, waits for approval on the `pypi` environment
+#   4. Docker          multi-arch image (amd64 + arm64) to GitHub Container Registry
+#   5. GitHub Release  release notes from CHANGELOG.md, with the packages attached
+#
+# No secrets live on anyone's laptop: PyPI trusts this workflow, GHCR uses GITHUB_TOKEN.
+# ---------------------------------------------------------------------------------------
 
-# Push a tag like v0.1.0 to publish that version everywhere:
-#   tests -> build UI -> uv build -> PyPI (Trusted Publishing) -> GHCR image -> GitHub Release
-# No tokens live on anyone's laptop: PyPI trusts this workflow, GHCR uses GITHUB_TOKEN.
+name: Release
 
 on:
   push:
@@ -11,78 +21,115 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
+    name: Test
     uses: ./.github/workflows/ci.yml
 
   build:
+    name: Build packages
     needs: test
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out
+        uses: actions/checkout@v4
+
       - name: Check the tag matches pyproject.toml
         id: version
         run: |
           version=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match pyproject.toml version $version" >&2
+            echo "::error::Tag $GITHUB_REF_NAME does not match pyproject.toml version $version"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: ui/package-lock.json
-      - run: npm ci && npm run build
+
+      - name: Build the dashboard
         working-directory: ui
-      - uses: astral-sh/setup-uv@v5
-      - run: uv build
+        run: npm ci && npm run build
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build wheel and sdist
+        run: uv build
+
       - name: Check the dashboard is inside the wheel
         run: unzip -l dist/*.whl | grep -q 'promptdock/ui/static/index.html'
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
   pypi:
+    name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    environment: pypi
+    environment:
+      name: pypi
+      url: https://pypi.org/project/promptdock/${{ needs.build.outputs.version }}/
     permissions:
       id-token: write # Trusted Publishing
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download packages
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
 
   docker:
+    name: Publish Docker image
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for arm64)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
+
+      - name: Image tags and labels
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/promptdock
           tags: |
             type=raw,value=${{ needs.build.outputs.version }}
             type=raw,value=latest
-      - uses: docker/build-push-action@v6
+
+      - name: Build and push (amd64 + arm64)
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -91,24 +138,54 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   github-release:
+    name: Create GitHub Release
     needs: [build, pypi, docker]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      OWNER: ${{ github.repository_owner }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - name: Release notes from CHANGELOG.md
+
+      - name: Write release notes
         run: |
-          awk -v heading="## [${{ needs.build.outputs.version }}]" '
+          image="ghcr.io/${OWNER,,}/promptdock"
+          changes=$(awk -v heading="## [$VERSION]" '
             index($0, heading) == 1 { found = 1; next }
             found && (index($0, "## [") == 1 || index($0, "[") == 1) { exit }
             found { print }
-          ' CHANGELOG.md > notes.md
-          test -s notes.md || echo "See CHANGELOG.md" > notes.md
-      - run: gh release create "$GITHUB_REF_NAME" dist/* --title "PromptDock $GITHUB_REF_NAME" --notes-file notes.md
+          ' CHANGELOG.md)
+          {
+            echo "## Install"
+            echo
+            echo '```bash'
+            echo "pip install \"promptdock==$VERSION\"            # library"
+            echo "pip install \"promptdock[ui]==$VERSION\"        # server + dashboard"
+            echo "docker pull $image:$VERSION"
+            echo '```'
+            echo
+            echo "## What's changed"
+            echo
+            echo "${changes:-See CHANGELOG.md.}"
+            echo
+            echo "---"
+            echo
+            echo "**Package:** [PyPI](https://pypi.org/project/promptdock/$VERSION/) ·" \
+                 "**Image:** [\`$image:$VERSION\`](https://github.com/$GITHUB_REPOSITORY/pkgs/container/promptdock) ·" \
+                 "**Full changelog:** [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/CHANGELOG.md)"
+          } > notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "PromptDock $VERSION" --notes-file notes.md

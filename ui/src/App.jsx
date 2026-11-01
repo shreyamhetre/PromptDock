@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { onUnauthorized, settings } from "./api.js";
-import PromptList from "./components/PromptList.jsx";
 import PromptDetail from "./components/PromptDetail.jsx";
+import PromptList from "./components/PromptList.jsx";
 import Settings from "./components/Settings.jsx";
 
 // Hash routes keep the UI from clashing with API paths:
@@ -40,13 +40,24 @@ export default function App() {
     setSettingsVersion((v) => v + 1); // re-fetch with the new name/token
   };
 
+  const initial = (settings.actor || "?").trim().charAt(0).toUpperCase();
   return (
     <>
       <header className="topbar">
-        <a className="brand" href="#/">PromptDock</a>
+        <a className="brand" href="#/">
+          <span className="brand-mark">P</span>
+          PromptDock
+        </a>
+        <nav className="topnav">
+          <a href="#/" className={route.page === "list" ? "active" : ""}>
+            Prompts
+          </a>
+        </nav>
         <span className="spacer" />
-        <span className="who">{settings.actor ? `Signed as ${settings.actor}` : "No name set"}</span>
-        <button onClick={() => setShowSettings(true)}>Settings</button>
+        <button className="user-chip" onClick={() => setShowSettings(true)} title="Settings">
+          <span className="avatar">{initial}</span>
+          {settings.actor || "Set your name"}
+        </button>
       </header>
       <main key={settingsVersion}>
         {route.page === "prompt" ? (

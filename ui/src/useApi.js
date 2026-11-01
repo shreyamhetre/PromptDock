@@ -17,13 +17,3 @@ export function useApi(path, params, reloadKey = 0) {
   useEffect(load, [load, reloadKey]);
   return { ...state, reload: load };
 }
-
-export function formatDate(iso) {
-  return new Date(iso).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}

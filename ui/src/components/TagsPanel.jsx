@@ -1,44 +1,46 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { api, p } from "../api.js";
-import { formatDate } from "../useApi.js";
-import { ErrorNotice, versionLabel } from "./common.jsx";
+import {
+  Dialog,
+  ErrorNotice,
+  Notice,
+  STAGES,
+  TagPill,
+  gateText,
+  timeAgo,
+  versionLabel,
+} from "./common.jsx";
 
-function GateSummary({ gate }) {
-  if (!gate) return <span className="muted">No gate</span>;
-  return (
-    <span className="subtle">
-      Gate:{" "}
-      {gate.rules
-        .map((rule) =>
-          [rule.min != null && `${rule.metric} ≥ ${rule.min}`, rule.max != null && `${rule.metric} ≤ ${rule.max}`]
-            .filter(Boolean)
-            .join(", "),
-        )
-        .join("; ")}
-      {gate.require_better_than_current && "; at least as good as current"}
-    </span>
-  );
+// Where an undo would take the tag: each rollback cancels the next older promote
+// (the same rule the server uses).
+function rollbackTarget(events) {
+  let pending = 0;
+  for (const event of events) {
+    if (event.action === "rollback") pending += 1;
+    else if (pending) pending -= 1;
+    else return event.from_version;
+  }
+  return null;
 }
 
-function TagCard({ name, tag, versions, onChange }) {
-  const latest = versions.length ? versions[versions.length - 1].version : null;
-  const [target, setTarget] = useState(latest ?? "");
+function PromoteDialog({ name, tag, versions, suggested, onClose, onDone }) {
+  const [target, setTarget] = useState(String(suggested));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
-  const [confirmRollback, setConfirmRollback] = useState(false);
+  const gateFailed = error?.type === "GateFailedError";
 
-  const run = async (request) => {
+  const promote = async (force) => {
     setBusy(true);
     setError(null);
-    setResult(null);
     try {
-      const updated = await request();
+      const updated = await api(`${p(name)}/tags/${encodeURIComponent(tag.name)}`, {
+        method: "PUT",
+        body: { version: Number(target), reason: reason.trim() || null, force },
+      });
       setResult(updated);
-      setReason("");
-      setConfirmRollback(false);
-      onChange();
+      onDone();
     } catch (err) {
       setError(err);
     } finally {
@@ -46,116 +48,288 @@ function TagCard({ name, tag, versions, onChange }) {
     }
   };
 
-  const promote = (force) =>
-    run(() =>
-      api(`${p(name)}/tags/${encodeURIComponent(tag.name)}`, {
-        method: "PUT",
-        body: { version: Number(target), reason: reason.trim() || null, force },
-      }),
+  if (result) {
+    return (
+      <Dialog
+        title={`${tag.name} now serves ${versionLabel(result.version)}`}
+        onClose={onClose}
+        footer={
+          <button className="primary" onClick={onClose}>
+            Done
+          </button>
+        }
+      >
+        <Notice kind="ok">Apps reading this tag pick it up within their cache time.</Notice>
+        {result.warnings?.map((warning) => (
+          <Notice key={warning} kind="warn">
+            {warning}
+          </Notice>
+        ))}
+      </Dialog>
     );
-  const rollback = () =>
-    run(() =>
-      api(`${p(name)}/tags/${encodeURIComponent(tag.name)}/rollback`, {
-        method: "POST",
-        body: { reason: reason.trim() || null },
-      }),
-    );
+  }
 
-  const gateFailed = error?.type === "GateFailedError";
   return (
-    <div className="card">
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <strong style={{ fontSize: 16 }}>{tag.name}</strong>
-        <span className="chip">
-          points to <strong>{versionLabel(tag.version)}</strong>
-        </span>
-      </div>
-      <div style={{ margin: "6px 0" }}>
-        <GateSummary gate={tag.gate} />
-      </div>
-      {tag.updated_by && (
-        <div className="muted" style={{ fontSize: 12 }}>
-          Last change by {tag.updated_by}, {formatDate(tag.updated_at)}
-        </div>
-      )}
-
-      <label htmlFor={`v-${tag.name}`}>Promote to</label>
-      <div className="row">
-        <select id={`v-${tag.name}`} value={target} onChange={(e) => setTarget(e.target.value)}>
-          {[...versions].reverse().map((v) => (
-            <option key={v.version} value={v.version}>
-              v{v.version}
-              {v.commit_message ? ` – ${v.commit_message.slice(0, 40)}` : ""}
-            </option>
-          ))}
-        </select>
-        <button
-          className="primary"
-          disabled={busy || !target || Number(target) === tag.version}
-          onClick={() => promote(false)}
-        >
-          Promote
-        </button>
-      </div>
-      <label htmlFor={`r-${tag.name}`}>Reason (optional; required to force or explain a rollback)</label>
+    <Dialog
+      title={`Promote ${tag.name}`}
+      description={`Currently ${versionLabel(tag.version)}. ${tag.gate ? "The gate is checked before the tag moves." : "This tag has no gate."}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose}>Cancel</button>
+          {gateFailed ? (
+            <button className="danger" disabled={busy || !reason.trim()} onClick={() => promote(true)}>
+              Force promote
+            </button>
+          ) : (
+            <button
+              className="primary"
+              disabled={busy || Number(target) === tag.version}
+              onClick={() => promote(false)}
+            >
+              Promote to {versionLabel(Number(target))}
+            </button>
+          )}
+        </>
+      }
+    >
+      <label className="field" htmlFor="promote-version">
+        Version
+      </label>
+      <select
+        id="promote-version"
+        value={target}
+        style={{ width: "100%" }}
+        onChange={(e) => {
+          setTarget(e.target.value);
+          setError(null);
+        }}
+      >
+        {[...versions].reverse().map((v) => (
+          <option key={v.version} value={v.version}>
+            v{v.version}
+            {v.commit_message ? ` — ${v.commit_message.slice(0, 50)}` : ""}
+            {v.version === tag.version ? " (current)" : ""}
+          </option>
+        ))}
+      </select>
+      {tag.gate && <div className="help">Gate: {gateText(tag.gate)}</div>}
+      <label className="field" htmlFor="promote-reason">
+        Reason {gateFailed ? "(required to force)" : "(optional)"}
+      </label>
       <input
-        id={`r-${tag.name}`}
+        id="promote-reason"
         type="text"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
+        placeholder="e.g. evals passed on faq-100"
       />
-
       <ErrorNotice error={error} />
       {gateFailed && (
-        <div className="row">
-          <button className="danger" disabled={busy || !reason.trim()} onClick={() => promote(true)}>
-            Force promote (bypass gate)
-          </button>
-          {!reason.trim() && <span className="muted">Enter a reason to force.</span>}
+        <div className="help">
+          Forcing bypasses the gate and is recorded in the audit log with your reason.
         </div>
       )}
-      {result && (
-        <div className="notice ok">
-          ✅ {tag.name} now points to {versionLabel(result.version)}.
-          {result.warnings?.length > 0 && (
-            <div className="notice warn" style={{ marginBottom: 0 }}>
-              ⚠️ {result.warnings.join(" ")}
-            </div>
-          )}
-        </div>
-      )}
+    </Dialog>
+  );
+}
 
-      <div style={{ marginTop: 12 }}>
-        {!confirmRollback ? (
-          <button disabled={busy || !tag.version} onClick={() => setConfirmRollback(true)}>
-            Roll back…
+function RollbackDialog({ name, tag, events, onClose, onDone }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const target = rollbackTarget(events.filter((e) => e.tag === tag.name));
+
+  const rollback = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`${p(name)}/tags/${encodeURIComponent(tag.name)}/rollback`, {
+        method: "POST",
+        body: { reason: reason.trim() || null },
+      });
+      onDone();
+      onClose();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog
+      title={`Roll back ${tag.name}`}
+      description={
+        target
+          ? `${tag.name} goes back from ${versionLabel(tag.version)} to ${versionLabel(target)}, undoing its last promote. Rollback never runs the gate.`
+          : `${tag.name} has no earlier version to go back to.`
+      }
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose}>Cancel</button>
+          <button className="danger" disabled={busy || !target} onClick={rollback}>
+            Roll back to {versionLabel(target)}
           </button>
-        ) : (
-          <div className="notice warn">
-            ⚠️ Undo the last promote of <strong>{tag.name}</strong>? Apps reading this tag switch
-            back within their cache time. Rollback does not run the gate.
-            <div className="row" style={{ marginTop: 8 }}>
-              <button className="danger" disabled={busy} onClick={rollback}>
-                Yes, roll back
-              </button>
-              <button onClick={() => setConfirmRollback(false)}>Cancel</button>
-            </div>
-          </div>
-        )}
+        </>
+      }
+    >
+      <label className="field" htmlFor="rollback-reason">
+        Reason (recommended)
+      </label>
+      <input
+        id="rollback-reason"
+        type="text"
+        value={reason}
+        autoFocus
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="e.g. answers got worse after the release"
+      />
+      <ErrorNotice error={error} />
+    </Dialog>
+  );
+}
+
+function Stage({ tag, onPromote, onRollback, canRollback }) {
+  const gate = gateText(tag.gate);
+  return (
+    <div className={`stage is-${tag.name}`}>
+      <div className="stage-head">
+        <span className="stage-name">{tag.name}</span>
+        {tag.gate && <span className="pill">Gated</span>}
+      </div>
+      <div className="stage-version">
+        {tag.version ? versionLabel(tag.version) : <span className="faint">Not deployed</span>}
+      </div>
+      <div className="stage-meta">
+        {tag.updated_by || tag.version
+          ? `Updated ${timeAgo(tag.updated_at)}${tag.updated_by ? ` by ${tag.updated_by}` : ""}`
+          : "No version promoted yet"}
+      </div>
+      <div className="stage-gate">{gate ? `Gate: ${gate}` : "No gate — any version can be promoted"}</div>
+      <div className="stage-actions">
+        <button className="primary small" onClick={onPromote}>
+          Promote…
+        </button>
+        <button className="small" disabled={!canRollback} onClick={onRollback}>
+          Roll back…
+        </button>
       </div>
     </div>
   );
 }
 
-export default function TagsPanel({ name, tags, versions, onChange }) {
+export default function TagsPanel({ name, tags, versions, events, onChange }) {
+  const [dialog, setDialog] = useState(null);
+
   if (versions.length === 0) {
-    return <div className="card">This prompt has no versions yet.</div>;
+    return (
+      <div className="panel">
+        <div className="empty">
+          <strong>No versions yet</strong>
+          Save one with <code>promptdock push</code> or the client, then promote it here.
+        </div>
+      </div>
+    );
   }
+
+  const byName = Object.fromEntries(tags.map((t) => [t.name, t]));
+  const stages = STAGES.filter((s) => byName[s]).map((s) => byName[s]);
+  const others = tags.filter((t) => !STAGES.includes(t.name));
+  const latest = versions[versions.length - 1].version;
+
+  // Default target: what the previous stage runs (moving a version down the pipeline),
+  // otherwise the latest version.
+  const suggestedFor = (tag) => {
+    const index = stages.indexOf(tag);
+    const previous = index > 0 ? stages[index - 1].version : null;
+    return previous && previous !== tag.version ? previous : latest;
+  };
+  const hasHistory = (tag) => events.some((e) => e.tag === tag.name) && rollbackTarget(events.filter((e) => e.tag === tag.name));
+
   return (
-    <div className="grid-cards">
-      {tags.map((tag) => (
-        <TagCard key={tag.name} name={name} tag={tag} versions={versions} onChange={onChange} />
-      ))}
-    </div>
+    <>
+      <div className="pipeline">
+        {stages.map((tag, i) => (
+          <Fragment key={tag.name}>
+            {i > 0 && <div className="pipe-arrow">→</div>}
+            <Stage
+              tag={tag}
+              canRollback={Boolean(hasHistory(tag))}
+              onPromote={() => setDialog({ kind: "promote", tag })}
+              onRollback={() => setDialog({ kind: "rollback", tag })}
+            />
+          </Fragment>
+        ))}
+      </div>
+
+      {others.length > 0 && (
+        <div className="panel other-tags">
+          <div className="panel-head">
+            <h2>Other tags</h2>
+            <span className="hint">Custom tags such as canaries or per-customer versions</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Version</th>
+                <th>Gate</th>
+                <th>Updated</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {others.map((tag) => (
+                <tr key={tag.name}>
+                  <td>
+                    <TagPill name={tag.name} />
+                  </td>
+                  <td className="mono">{versionLabel(tag.version)}</td>
+                  <td className="muted">{gateText(tag.gate) || "–"}</td>
+                  <td className="muted">
+                    {timeAgo(tag.updated_at)}
+                    {tag.updated_by ? ` by ${tag.updated_by}` : ""}
+                  </td>
+                  <td className="right nowrap">
+                    <button className="small" onClick={() => setDialog({ kind: "promote", tag })}>
+                      Promote…
+                    </button>{" "}
+                    <button
+                      className="small"
+                      disabled={!hasHistory(tag)}
+                      onClick={() => setDialog({ kind: "rollback", tag })}
+                    >
+                      Roll back…
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {dialog?.kind === "promote" && (
+        <PromoteDialog
+          name={name}
+          tag={dialog.tag}
+          versions={versions}
+          suggested={suggestedFor(dialog.tag)}
+          onClose={() => setDialog(null)}
+          onDone={onChange}
+        />
+      )}
+      {dialog?.kind === "rollback" && (
+        <RollbackDialog
+          name={name}
+          tag={dialog.tag}
+          events={events}
+          onClose={() => setDialog(null)}
+          onDone={onChange}
+        />
+      )}
+    </>
   );
 }

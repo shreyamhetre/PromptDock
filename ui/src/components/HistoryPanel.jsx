@@ -1,61 +1,73 @@
 import { useState } from "react";
-import { p } from "../api.js";
-import { formatDate, useApi } from "../useApi.js";
-import { ErrorNotice, versionLabel } from "./common.jsx";
+import { TagPill, formatDate, timeAgo, versionLabel } from "./common.jsx";
 
-export default function HistoryPanel({ name, tags, reloadKey }) {
+function describe(event) {
+  if (event.action === "rollback") {
+    return `Rolled back to ${versionLabel(event.to_version)}`;
+  }
+  return event.from_version
+    ? `Promoted ${versionLabel(event.from_version)} → ${versionLabel(event.to_version)}`
+    : `First promote to ${versionLabel(event.to_version)}`;
+}
+
+export default function HistoryPanel({ events, tags }) {
   const [tag, setTag] = useState("");
-  const path = tag ? `${p(name)}/tags/${encodeURIComponent(tag)}/events` : `${p(name)}/events`;
-  const { data: events, error } = useApi(path, null, reloadKey);
+  const shown = tag ? events.filter((e) => e.tag === tag) : events;
+  const used = tags.filter((t) => events.some((e) => e.tag === t.name));
 
   return (
-    <>
-      <div className="row" style={{ marginBottom: 12 }}>
-        <label className="row" style={{ margin: 0 }}>
-          Tag
-          <select value={tag} onChange={(e) => setTag(e.target.value)}>
-            <option value="">All tags</option>
-            {tags.map((t) => (
-              <option key={t.name} value={t.name}>
+    <div className="panel">
+      <div className="panel-head">
+        <h2>Audit log</h2>
+        {used.length > 1 && (
+          <div className="segmented">
+            <button className={tag === "" ? "on" : ""} onClick={() => setTag("")}>
+              All
+            </button>
+            {used.map((t) => (
+              <button key={t.name} className={tag === t.name ? "on" : ""} onClick={() => setTag(t.name)}>
                 {t.name}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        )}
       </div>
-      <ErrorNotice error={error} />
-      {events && events.length === 0 && <p className="muted">No promotes or rollbacks yet.</p>}
-      {events && events.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Tag</th>
-              <th>Action</th>
-              <th>From → to</th>
-              <th>Who</th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => (
-              <tr key={e.id}>
-                <td className="subtle">{formatDate(e.created_at)}</td>
-                <td>{e.tag}</td>
-                <td>
-                  {e.action}
-                  {e.forced && <span className="chip">⚠️ forced</span>}
-                </td>
-                <td>
-                  {versionLabel(e.from_version)} → <strong>{versionLabel(e.to_version)}</strong>
-                </td>
-                <td>{e.actor || <span className="muted">unknown</span>}</td>
-                <td>{e.reason || ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {shown.length === 0 ? (
+        <div className="empty">
+          <strong>No promotes or rollbacks yet</strong>
+          Every tag move will be recorded here with who, when and why.
+        </div>
+      ) : (
+        <ul className="timeline">
+          {shown.map((e) => {
+            const kind = e.forced ? "forced" : e.action;
+            const icon = e.forced ? "!" : e.action === "rollback" ? "↺" : "↑";
+            return (
+              <li key={e.id}>
+                <span className={`event-icon ${kind}`} aria-hidden="true">
+                  {icon}
+                </span>
+                <div>
+                  <div className="event-title">
+                    <TagPill name={e.tag} /> {describe(e)}
+                  </div>
+                  <div className="event-sub">
+                    {e.action === "rollback" && e.from_version
+                      ? `from ${versionLabel(e.from_version)} · `
+                      : ""}
+                    by {e.actor || "unknown"} · {formatDate(e.created_at)}
+                  </div>
+                  {e.reason && <div className="event-reason">“{e.reason}”</div>}
+                </div>
+                <div className="right">
+                  {e.forced && <span className="pill" style={{ color: "var(--bad)" }}>Gate bypassed</span>}
+                  <div className="event-sub">{timeAgo(e.created_at)}</div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </>
+    </div>
   );
 }

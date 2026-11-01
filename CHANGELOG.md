@@ -7,6 +7,25 @@ stable).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-01
+
+### Changed
+
+- **Redesigned dashboard.** Each prompt opens with a summary (version live in prod, latest
+  version, version count, last change). Tags are shown as a `dev` → `preprod` → `prod`
+  deployment pipeline; promote and rollback open focused dialogs, and rollback states
+  exactly which version the tag returns to. The leaderboard formats numbers per metric,
+  marks which direction is better, highlights the best score, and charts one metric at a
+  time with the gate threshold drawn on it. Versions show the template with highlighted
+  variables and a copy button; the audit log is a timeline that flags gate bypasses.
+- README rewritten; package metadata now lists supported Python versions and topics.
+- Release notes include install commands for the exact version and the Docker image.
+
+### Fixed
+
+- Gates saved by pre-release builds (with a `higher_is_better` field) no longer make the
+  tag list fail with an error 500; gates sent by users are still validated strictly.
+
 ## [0.1.0] - 2026-11-01
 
 First release.
@@ -51,5 +70,6 @@ First release.
 - Examples for OpenAI, Anthropic and LangChain, and an LLM-as-judge eval script.
 - No telemetry or usage tracking.
 
-[Unreleased]: https://github.com/shreyamhetre/PromptDock/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/shreyamhetre/PromptDock/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/shreyamhetre/PromptDock/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/shreyamhetre/PromptDock/releases/tag/v0.1.0
