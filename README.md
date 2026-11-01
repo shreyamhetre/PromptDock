@@ -16,7 +16,7 @@ if you run one, your own PromptDock server.
 | Library | `pip install promptdock` | import and use |
 | Server | `pip install promptdock[server]` | `promptdock serve` |
 | Server + UI | `pip install promptdock[ui]` | `promptdock serve --ui` |
-| Docker | `docker run ghcr.io/promptdock/promptdock` | — |
+| Docker | `docker run ghcr.io/shreyamhetre/promptdock` | — |
 
 All modes use Postgres (14 or newer), configured with `DATABASE_URL`. Python 3.10+.
 
@@ -98,7 +98,7 @@ token: `PROMPTDOCK_TOKEN=... promptdock serve --host 0.0.0.0`. Every request exc
 ## Quickstart (Docker)
 
 ```bash
-docker run -p 8000:8000   -e DATABASE_URL=postgresql://user:password@db-host:5432/promptdock   -e PROMPTDOCK_TOKEN=change-me   ghcr.io/promptdock/promptdock
+docker run -p 8000:8000   -e DATABASE_URL=postgresql://user:password@db-host:5432/promptdock   -e PROMPTDOCK_TOKEN=change-me   ghcr.io/shreyamhetre/promptdock
 ```
 
 The container runs `promptdock migrate`, then serves the API and dashboard on port 8000
@@ -171,7 +171,7 @@ gates still apply, and agents can never force. Agent changes are recorded with t
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The dashboard source is in `ui/` (React + Vite + Recharts):
+See [CONTRIBUTING.md](https://github.com/shreyamhetre/PromptDock/blob/main/CONTRIBUTING.md). The dashboard source is in `ui/` (React + Vite + Recharts):
 `cd ui && npm ci && npm run build` writes the built files into `src/promptdock/ui/static/`.
 
 ## License

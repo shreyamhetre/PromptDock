@@ -45,7 +45,10 @@ dev = [
 promptdock = "promptdock.cli:app"
 
 [project.urls]
+Homepage = "https://github.com/shreyamhetre/PromptDock"
 Repository = "https://github.com/shreyamhetre/PromptDock"
+Issues = "https://github.com/shreyamhetre/PromptDock/issues"
+Changelog = "https://github.com/shreyamhetre/PromptDock/blob/main/CHANGELOG.md"
 
 # `uv sync` installs the dev group by default, which pulls in the `dev` extra.
 [dependency-groups]

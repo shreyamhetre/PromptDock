@@ -44,7 +44,7 @@ First release.
 - **MCP server** (`pip install promptdock[mcp]`, `promptdock mcp`). Tools for agents:
   `list_prompts`, `get_prompt`, `create_version`, `compare_versions`, `get_leaderboard`,
   and `promote` only with `--allow-promote` (never forced); actor `mcp:<OS username>`.
-- **Docker image** `ghcr.io/promptdock/promptdock` (migrates, then serves API and
+- **Docker image** `ghcr.io/shreyamhetre/promptdock` (migrates, then serves API and
   dashboard) and `docker compose --profile server up` for local use.
 - Read-only database views with names instead of ids: `v_prompt_status`, `v_versions`,
   `v_tags`, `v_tag_history`, `v_eval_results`.
