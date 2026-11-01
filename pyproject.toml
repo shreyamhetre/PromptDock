@@ -1,6 +1,6 @@
 [project]
 name = "promptdock"
-version = "0.0.1"
+version = "0.1.0"
 description = "Focused prompt versioning: immutable versions, movable tags, eval-gated promotion."
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,7 @@ authors = [
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
 ]
 dependencies = [
     "pydantic>=2.6",

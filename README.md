@@ -4,7 +4,10 @@ Focused prompt versioning. PromptDock stores **immutable prompt versions**, poin
 (`dev`, `preprod`, `prod`, or your own) at them, and attaches **eval results** so a tag can only
 move to a version that passes its gate. Promote and rollback move a pointer, never your code.
 
-> Status: pre-alpha, under active development.
+> Status: 0.1 — early. The API may still change before 1.0.
+
+PromptDock collects **no telemetry or usage data**. It only talks to your own Postgres and,
+if you run one, your own PromptDock server.
 
 ## Ways to use it
 
@@ -13,9 +16,19 @@ move to a version that passes its gate. Promote and rollback move a pointer, nev
 | Library | `pip install promptdock` | import and use |
 | Server | `pip install promptdock[server]` | `promptdock serve` |
 | Server + UI | `pip install promptdock[ui]` | `promptdock serve --ui` |
-| Docker | `docker run promptdock/server` | — |
+| Docker | `docker run ghcr.io/promptdock/promptdock` | — |
 
-All modes use Postgres, configured with `DATABASE_URL`.
+All modes use Postgres (14 or newer), configured with `DATABASE_URL`. Python 3.10+.
+
+The idea in one table — apps always ask for a **tag**; you move tags, never app code:
+
+| Step | What you do | Versions | dev | preprod | prod |
+| --- | --- | --- | --- | --- | --- |
+| 1 | save the prompt | v1 | – | – | – |
+| 2 | promote v1 to dev, then preprod, then prod | v1 | v1 | v1 | v1 |
+| 3 | edit and save | v1, v2 | v1 | v1 | v1 |
+| 4 | promote v2 to dev, preprod, prod (evals pass the gate) | v1, v2 | v2 | v2 | v2 |
+| 5 | v2 misbehaves: roll back prod | v1, v2 | v2 | v2 | **v1** |
 
 ## Quickstart (library mode)
 
@@ -74,11 +87,24 @@ Any language can call the REST API, e.g.
 **Who did it:** send `X-Actor: <name>` on changes (the Python client sends its `actor`,
 which defaults to your OS username). It is recorded in the history, not verified.
 
-**Securing your server:** there are no user accounts. `promptdock serve` only listens on
+### Securing your server
+
+There are no user accounts. `promptdock serve` only listens on
 this machine by default. To share it, either run it on a private network or set a shared
 token: `PROMPTDOCK_TOKEN=... promptdock serve --host 0.0.0.0`. Every request except
 `/health` must then send `Authorization: Bearer <token>`; clients pass `token=...` (or set
 `PROMPTDOCK_TOKEN`). Listening on `0.0.0.0` without a token prints a warning.
+
+## Quickstart (Docker)
+
+```bash
+docker run -p 8000:8000   -e DATABASE_URL=postgresql://user:password@db-host:5432/promptdock   -e PROMPTDOCK_TOKEN=change-me   ghcr.io/promptdock/promptdock
+```
+
+The container runs `promptdock migrate`, then serves the API and dashboard on port 8000
+(`/docs`, `/ui/`). It listens on `0.0.0.0`, so set `PROMPTDOCK_TOKEN` unless it runs on a
+private network. To try it locally with a bundled Postgres:
+`docker compose --profile server up -d`.
 
 ## Dashboard
 

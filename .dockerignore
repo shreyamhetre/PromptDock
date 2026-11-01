@@ -1,0 +1,11 @@
+.git
+.venv
+.venv-*
+**/__pycache__
+**/node_modules
+dist
+.pytest_cache
+.mypy_cache
+.ruff_cache
+src/promptdock/ui/static
+.env

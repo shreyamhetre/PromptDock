@@ -25,6 +25,10 @@ def _result(result: Any) -> Any:
     return json.loads(result.content[0].text)
 
 
+def _error_text(result: Any) -> str:
+    return str(getattr(result.content[0], "text", ""))
+
+
 def _session(server: Any, body: Callable[[McpClient], Awaitable[None]]) -> None:
     async def main() -> None:
         async with McpClient(server) as mcp:
@@ -95,7 +99,7 @@ def test_tools_without_promote(client: Client) -> None:
 
         missing = await mcp.call_tool("get_prompt", {"name": "nope"})
         assert missing.is_error
-        assert "not found" in missing.content[0].text
+        assert "not found" in _error_text(missing)
 
     _session(build_server(client), body)
 
@@ -109,7 +113,7 @@ def test_promote_only_when_allowed_and_never_forced(client: Client) -> None:
         assert "force" not in json.dumps(tools["promote"].input_schema)
 
         refused = await mcp.call_tool("promote", {"name": NAME, "tag": "prod", "version": 1})
-        assert refused.is_error and "below the minimum 0.95" in refused.content[0].text
+        assert refused.is_error and "below the minimum 0.95" in _error_text(refused)
 
         moved = _result(await mcp.call_tool("promote", {"name": NAME, "tag": "dev", "version": 1}))
         assert moved["version"] == 1

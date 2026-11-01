@@ -99,3 +99,59 @@ def test_cli_migrate_unreachable_database() -> None:
     )
     assert result.exit_code == 1
     assert "Could not connect" in result.output
+
+
+def test_data_survives_upgrades_from_the_first_schema(empty_db_url: str) -> None:
+    """Data written at revision 0001 is intact and usable after upgrading to head."""
+    from sqlalchemy.orm import Session
+
+    from promptdock.core import service
+    from promptdock.models import PromptVersionCreate
+
+    migrate.upgrade(empty_db_url, "0001")
+    engine = create_engine(empty_db_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("INSERT INTO prompts (project_id, name) VALUES (1, 'old-bot')"))
+            conn.execute(
+                text(
+                    "INSERT INTO prompt_versions (prompt_id, version, template_type, template,"
+                    " variables, content_hash) VALUES (1, 1, 'text', '\"Hi {{ u }}\"', '[\"u\"]',"
+                    " 'h1')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO tags (prompt_id, name, version_id, is_protected)"
+                    " VALUES (1, 'prod', 1, true)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO tag_events (tag_id, to_version_id, action, actor)"
+                    " VALUES (1, 1, 'promote', 'shreya')"
+                )
+            )
+            conn.execute(
+                text("INSERT INTO api_keys (name, key_hash, scopes) VALUES ('k', 'x', '[]')")
+            )
+
+        assert migrate.upgrade(empty_db_url) == "0004"
+
+        with Session(engine) as session:
+            assert service.get_by_tag(session, "old-bot", "prod").template == "Hi {{ u }}"
+            assert service.list_tag_events(session, "old-bot", "prod")[0].actor == "shreya"
+            service.create_version(
+                session, "old-bot", PromptVersionCreate(template="Hello {{ u }}")
+            )
+            assert service.promote(session, "old-bot", "prod", 2).version == 2
+            session.commit()
+    finally:
+        engine.dispose()
+
+
+def test_full_downgrade_and_upgrade_round_trip(empty_db_url: str) -> None:
+    migrate.upgrade(empty_db_url)
+    for revision in ("0003", "0002", "0001", "base"):
+        migrate.downgrade(empty_db_url, revision)
+    assert migrate.upgrade(empty_db_url) == "0004"

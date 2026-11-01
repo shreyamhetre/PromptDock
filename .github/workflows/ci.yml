@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_call: # reused by release.yml
 
 jobs:
   lint:
@@ -15,6 +16,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
+      - run: uv run mypy tests
 
   test:
     name: test (Python ${{ matrix.python-version }}, Postgres ${{ matrix.postgres }})

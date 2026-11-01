@@ -1,4 +1,6 @@
-# Local development database. Start with: docker compose up -d
+# Local development.
+#   docker compose up -d                    Postgres only (for tests and the library)
+#   docker compose --profile server up -d   Postgres + PromptDock server and dashboard on :8000
 services:
   postgres:
     image: postgres:16
@@ -15,6 +17,18 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  server:
+    profiles: ["server"]
+    build: .
+    environment:
+      DATABASE_URL: postgresql://promptdock:promptdock@postgres:5432/promptdock
+      PROMPTDOCK_TOKEN: ${PROMPTDOCK_TOKEN:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata:
