@@ -1,155 +1,196 @@
+<div align="center">
+
+<img src="docs/assets/logo.svg" alt="PromptDock logo" width="88" height="88">
+
 # PromptDock
 
-Focused prompt versioning. PromptDock stores **immutable prompt versions**, points **tags**
-(`dev`, `preprod`, `prod`, or your own) at them, and attaches **eval results** so a tag can only
-move to a version that passes its gate. Promote and rollback move a pointer, never your code.
+**Version your prompts like code. Ship them like releases.**
 
-> Status: 0.1 — early. The API may still change before 1.0.
+Immutable prompt versions · movable `dev` / `preprod` / `prod` tags · eval-gated promotion · one-click rollback
 
-PromptDock collects **no telemetry or usage data**. It only talks to your own Postgres and,
-if you run one, your own PromptDock server.
+[![PyPI](https://img.shields.io/pypi/v/promptdock?color=2a78d6&label=PyPI)](https://pypi.org/project/promptdock/)
+[![Python](https://img.shields.io/pypi/pyversions/promptdock?color=2a78d6)](https://pypi.org/project/promptdock/)
+[![CI](https://github.com/shreyamhetre/PromptDock/actions/workflows/ci.yml/badge.svg)](https://github.com/shreyamhetre/PromptDock/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-2a78d6?logo=docker&logoColor=white)](https://github.com/shreyamhetre/PromptDock/pkgs/container/promptdock)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2a78d6)](https://github.com/shreyamhetre/PromptDock/blob/main/LICENSE)
 
-## Ways to use it
+[Quickstart](#quickstart) · [Dashboard](#dashboard) · [CLI](#command-line) · [AI agents](#ai-agents-mcp) · [Docker](#docker) · [Changelog](https://github.com/shreyamhetre/PromptDock/blob/main/CHANGELOG.md)
 
-| Mode | Install | Run |
-| --- | --- | --- |
-| Library | `pip install promptdock` | import and use |
-| Server | `pip install promptdock[server]` | `promptdock serve` |
-| Server + UI | `pip install promptdock[ui]` | `promptdock serve --ui` |
-| Docker | `docker run ghcr.io/shreyamhetre/promptdock` | — |
+</div>
 
-All modes use Postgres (14 or newer), configured with `DATABASE_URL`. Python 3.10+.
+## Why PromptDock
 
-The idea in one table — apps always ask for a **tag**; you move tags, never app code:
+Prompts change more often than code, but they usually ship with the code — so every wording
+tweak is a deploy, and every bad prompt is an incident with no quick undo.
 
-| Step | What you do | Versions | dev | preprod | prod |
-| --- | --- | --- | --- | --- | --- |
-| 1 | save the prompt | v1 | – | – | – |
-| 2 | promote v1 to dev, then preprod, then prod | v1 | v1 | v1 | v1 |
-| 3 | edit and save | v1, v2 | v1 | v1 | v1 |
-| 4 | promote v2 to dev, preprod, prod (evals pass the gate) | v1, v2 | v2 | v2 | v2 |
-| 5 | v2 misbehaves: roll back prod | v1, v2 | v2 | v2 | **v1** |
+PromptDock separates the two. Your app asks for a **tag**; you decide which **version** the
+tag points to.
 
-## Quickstart (library mode)
+```python
+prompt = client.get_prompt("support-bot", tag="prod")  # never a hard-coded version
+```
+
+| Step | What you do | Versions | `dev` | `preprod` | `prod` |
+| :-: | --- | :-: | :-: | :-: | :-: |
+| 1 | Save a prompt | v1 | – | – | – |
+| 2 | Promote it through the environments | v1 | v1 | v1 | v1 |
+| 3 | Edit and save | v1, v2 | v1 | v1 | v1 |
+| 4 | Promote v2 — the eval gate checks its scores first | v1, v2 | v2 | v2 | v2 |
+| 5 | v2 misbehaves: **roll back** prod | v1, v2 | v2 | v2 | **v1** |
+
+Apps pick up every promote and rollback within their cache time (60 s by default). **No redeploy, no code change.**
+
+## Features
+
+| | |
+| --- | --- |
+| **Immutable versions** | Text or chat templates with `{{ variables }}` and model settings. Saving identical content never creates a duplicate. |
+| **Tags as pointers** | `dev`, `preprod`, `prod` out of the box, plus your own (`canary-eu`, per-customer…). |
+| **Eval gates** | Push scores from any eval tool. A gate like `accuracy ≥ 0.85` blocks promotion of a worse version. |
+| **Instant rollback** | Undo the last promote — again and again, like undo. Never blocked by gates. |
+| **Full audit log** | Every move records who, when, from → to and why. Forced promotes are flagged. |
+| **Leaderboard & diff** | Compare versions by score and see exactly what changed in text and settings. |
+| **Resilient reads** | Cached, and apps keep the last good prompt if the database or server is down. |
+| **Use it your way** | Python library, REST API, dashboard, CLI, MCP server for AI agents, or Docker. |
+
+## Quickstart
 
 ```bash
+pip install promptdock
 export DATABASE_URL=postgresql://user:password@localhost:5432/promptdock
 promptdock migrate
 ```
 
 ```python
+from openai import OpenAI
 from promptdock import Client
 
-client = Client()  # reads DATABASE_URL; or Client("postgresql://...", actor="shreya")
+client = Client()  # reads DATABASE_URL; your OS username is recorded as the actor
+llm = OpenAI()
 
 client.create_prompt("support-bot")
 client.create_version(
     "support-bot",
     [
-        {"role": "system", "content": "You support {{ product }}."},
+        {"role": "system", "content": "You support {{ product }}. Be concise."},
         {"role": "user", "content": "{{ question }}"},
     ],
     model_config={"model": "gpt-4o", "temperature": 0.2},
-    commit_message="first version",
+    commit_message="First version",
 )
-client.promote("support-bot", "prod", 1)  # recorded with actor = your OS username
+client.promote("support-bot", "prod", 1)
 
-# In your app: always ask for a tag, never a hard-coded version.
+# In your app
 prompt = client.get_prompt("support-bot", tag="prod")
-messages = prompt.render(product="PromptDock", question="How do I roll back?")
-# call your LLM with messages and prompt.model_config
-
-client.rollback("support-bot", "prod")  # apps pick this up within the cache TTL (60 s)
+messages = prompt.render(product="Acme", question="How do I reset my password?")
+response = llm.chat.completions.create(messages=messages, **prompt.model_config)
 ```
 
-Reads are cached for `cache_ttl` seconds (default 60). If the database is unreachable,
-`get_prompt` returns the last version it fetched and logs a warning; pass
-`snapshot_path="prompts.json"` to keep those copies on disk for restarts.
+`render()` raises `MissingVariableError` naming any variable you forgot. Ready-to-run
+examples for [OpenAI](examples/openai_app.py), [Anthropic](examples/anthropic_app.py),
+[LangChain](examples/langchain_app.py) and an [LLM-as-judge eval script](examples/push_evals_llm_judge.py)
+are in [`examples/`](examples/).
 
-## Quickstart (server mode)
+### Ways to run it
+
+| Mode | Install | Run | Best for |
+| --- | --- | --- | --- |
+| Library | `pip install promptdock` | `Client()` | One app talking to its own Postgres |
+| Server | `pip install "promptdock[server]"` | `promptdock serve` | Many apps or languages sharing one registry |
+| Dashboard | `pip install "promptdock[ui]"` | `promptdock serve --ui` | Teams who want to see and promote in a browser |
+| Docker | — | `docker run ghcr.io/shreyamhetre/promptdock` | Non-Python teams, servers without pip |
+| AI agents | `pip install "promptdock[mcp]"` | `promptdock mcp` | Claude Desktop, Cursor and other MCP clients |
+
+Requirements: Python 3.10+ and Postgres 14+.
+
+## Eval gates
+
+Push results from any evaluation — a script, an LLM judge, a CI job — in one fixed shape:
+
+```json
+{"prompt": "support-bot", "version": 4, "metric": "accuracy", "score": 0.87,
+ "run_id": "run-2026-10-30", "evaluator": "llm-judge", "metadata": {"dataset": "faq-100"}}
+```
+
+Then require a quality bar before a tag can move:
 
 ```bash
-pip install "promptdock[server]"
-promptdock migrate
-promptdock serve                      # http://127.0.0.1:8000, API docs at /docs
+promptdock gate set support-bot prod --min accuracy=0.85 --max latency_ms=1200
+promptdock promote support-bot prod 5
+# Error: Gate for tag 'prod' on prompt 'support-bot' failed:
+#   - accuracy: 0.81 is below the minimum 0.85
 ```
 
-```python
-from promptdock import Client
-
-client = Client(base_url="http://127.0.0.1:8000")  # same methods as library mode
-prompt = client.get_prompt("support-bot", tag="prod")
-```
-
-Any language can call the REST API, e.g.
-`curl "http://127.0.0.1:8000/prompts/support-bot?tag=prod"`.
-
-**Who did it:** send `X-Actor: <name>` on changes (the Python client sends its `actor`,
-which defaults to your OS username). It is recorded in the history, not verified.
-
-### Securing your server
-
-There are no user accounts. `promptdock serve` only listens on
-this machine by default. To share it, either run it on a private network or set a shared
-token: `PROMPTDOCK_TOKEN=... promptdock serve --host 0.0.0.0`. Every request except
-`/health` must then send `Authorization: Bearer <token>`; clients pass `token=...` (or set
-`PROMPTDOCK_TOKEN`). Listening on `0.0.0.0` without a token prints a warning.
-
-## Quickstart (Docker)
-
-```bash
-docker run -p 8000:8000   -e DATABASE_URL=postgresql://user:password@db-host:5432/promptdock   -e PROMPTDOCK_TOKEN=change-me   ghcr.io/shreyamhetre/promptdock
-```
-
-The container runs `promptdock migrate`, then serves the API and dashboard on port 8000
-(`/docs`, `/ui/`). It listens on `0.0.0.0`, so set `PROMPTDOCK_TOKEN` unless it runs on a
-private network. To try it locally with a bundled Postgres:
-`docker compose --profile server up -d`.
+`min` means higher is better, `max` means lower is better. The gate uses each metric's latest
+score; a missing score fails. `--force --reason "…"` bypasses it and is recorded.
 
 ## Dashboard
 
 ```bash
 pip install "promptdock[ui]"
-promptdock serve --ui          # http://127.0.0.1:8000/ui/
+promptdock serve --ui            # http://127.0.0.1:8000/ui/
 ```
 
-Prompts list, versions and tags, a sortable leaderboard with a score-over-versions chart
-per metric, diffs between any two versions, and the audit log. You can promote (the gate
-result is shown) and roll back (with a confirm step). It asks once for your name (sent as
-`X-Actor`) and, if the server has one, the token; both stay in your browser. No Node is
-needed to run it.
+The dashboard shows each prompt's deployment pipeline (`dev` → `preprod` → `prod`), its
+versions, a sortable leaderboard with a score chart per metric, a diff of any two versions and
+the audit log. You can promote (the gate result is shown) and roll back with a confirmation.
+No Node.js needed — the dashboard ships inside the package.
+
+## Server and REST API
+
+```bash
+pip install "promptdock[server]"
+promptdock serve                 # http://127.0.0.1:8000 — interactive API docs at /docs
+```
+
+```python
+client = Client(base_url="http://127.0.0.1:8000")  # same methods as library mode
+```
+
+Any language can use it: `curl "http://127.0.0.1:8000/prompts/support-bot?tag=prod"`.
+Responses carry an `ETag`, so unchanged prompts cost a tiny `304`.
+
+<details>
+<summary><b>Securing your server</b></summary>
+<br>
+
+There are no user accounts. `promptdock serve` listens only on this machine by default. To
+share it, run it on a private network **or** set a shared token:
+
+```bash
+PROMPTDOCK_TOKEN=change-me promptdock serve --host 0.0.0.0
+```
+
+Every request except `/health` must then send `Authorization: Bearer <token>`; clients pass
+`token=...` or set `PROMPTDOCK_TOKEN`. Listening on `0.0.0.0` without a token prints a warning.
+
+Who made a change is self-reported in the `X-Actor` header (the Python client sends its
+`actor`, which defaults to your OS username) — an honest team history, like a git author,
+not a security control.
+</details>
 
 ## Command line
 
 The CLI connects like the client: `PROMPTDOCK_URL` (+ `PROMPTDOCK_TOKEN`) for a server,
-otherwise `DATABASE_URL`. Changes are recorded with `--actor` (default: your OS username).
+otherwise `DATABASE_URL`.
 
 ```bash
-promptdock export ./prompts                  # one YAML file per prompt (latest version)
-# ...edit ./prompts/support-bot.yaml...
-promptdock push ./prompts --tag dev -m "friendlier tone"   # new versions only for changed files
-promptdock evals push results.jsonl          # eval results, one JSON object per line
+promptdock export ./prompts                        # one YAML file per prompt
+promptdock push ./prompts --tag dev -m "Friendlier"  # new versions for changed files only
+promptdock evals push results.jsonl                # eval results, one JSON object per line
 promptdock promote support-bot prod 3 --reason "evals passed"
 promptdock rollback support-bot prod --reason "complaints"
-promptdock versions list support-bot
+promptdock leaderboard support-bot --sort accuracy
+promptdock diff support-bot 3 4
 promptdock history support-bot prod
 ```
 
-`push` never overwrites anything and never moves `prod`; promote to `prod` explicitly.
-
-```bash
-promptdock gate set support-bot prod --min accuracy=0.85 --max latency_ms=1200
-promptdock leaderboard support-bot --sort accuracy
-promptdock diff support-bot 3 7
-```
-
-A gate uses the latest result per metric; a missing metric fails. `--force --reason ...`
-bypasses a failing gate and is recorded. Rollback never runs the gate.
+`push` never overwrites anything and never moves `prod` — promoting to production is always
+an explicit step.
 
 ## AI agents (MCP)
 
-`pip install "promptdock[mcp]"`, then add PromptDock to your agent's MCP config. For
-Claude Desktop (`claude_desktop_config.json`) or Cursor (`.cursor/mcp.json`):
+Let Claude Desktop, Cursor or any MCP client read and version prompts:
 
 ```json
 {
@@ -163,17 +204,32 @@ Claude Desktop (`claude_desktop_config.json`) or Cursor (`.cursor/mcp.json`):
 }
 ```
 
-Use `PROMPTDOCK_URL` (+ `PROMPTDOCK_TOKEN`) instead of `DATABASE_URL` to go through a
-server. Tools: `list_prompts`, `get_prompt`, `create_version`, `compare_versions`,
-`get_leaderboard`. `promote` is only offered with `"args": ["mcp", "--allow-promote"]`,
-gates still apply, and agents can never force. Agent changes are recorded with the actor
-`mcp:<your OS username>`.
+Tools: `list_prompts`, `get_prompt`, `create_version`, `compare_versions`, `get_leaderboard`.
+`promote` is available only with `"args": ["mcp", "--allow-promote"]`; gates still apply and
+agents can never force. Agent changes are recorded as `mcp:<your OS username>`.
 
-## Development
+## Docker
 
-See [CONTRIBUTING.md](https://github.com/shreyamhetre/PromptDock/blob/main/CONTRIBUTING.md). The dashboard source is in `ui/` (React + Vite + Recharts):
-`cd ui && npm ci && npm run build` writes the built files into `src/promptdock/ui/static/`.
+```bash
+docker run -p 8000:8000 \
+  -e DATABASE_URL=postgresql://user:password@db-host:5432/promptdock \
+  -e PROMPTDOCK_TOKEN=change-me \
+  ghcr.io/shreyamhetre/promptdock
+```
+
+The container migrates the database, then serves the API and dashboard on port 8000. To try
+everything locally with a bundled Postgres: `docker compose --profile server up -d`.
+
+## Privacy
+
+PromptDock collects **no telemetry or usage data**. It talks only to your own Postgres and,
+if you run one, your own PromptDock server.
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests and the
+release process.
 
 ## License
 
-MIT
+[MIT](LICENSE)
