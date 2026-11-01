@@ -1,3 +1,4 @@
+import os
 import uuid
 from collections.abc import Iterator
 
@@ -6,13 +7,16 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+# CI runs the suite against several Postgres versions by setting this variable.
+POSTGRES_IMAGE = os.environ.get("PROMPTDOCK_TEST_POSTGRES_IMAGE", "postgres:16")
+
 
 @pytest.fixture(scope="session")
 def postgres_url() -> Iterator[str]:
-    """A Postgres 16 server for the whole test session (needs Docker)."""
+    """A Postgres server for the whole test session (needs Docker)."""
     from testcontainers.community.postgres import PostgresContainer
 
-    with PostgresContainer("postgres:16", driver="psycopg") as container:
+    with PostgresContainer(POSTGRES_IMAGE, driver="psycopg") as container:
         yield container.get_connection_url()
 
 

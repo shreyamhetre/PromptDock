@@ -30,6 +30,14 @@ server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 ui = ["promptdock[server]"]
 mcp = ["mcp>=1.0"]
 all = ["promptdock[server,ui,mcp]"]
+dev = [
+    "promptdock[all]",
+    "pytest>=8",
+    "testcontainers[postgres]>=4",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
 
 [project.scripts]
 promptdock = "promptdock.cli:app"
@@ -37,14 +45,9 @@ promptdock = "promptdock.cli:app"
 [project.urls]
 Repository = "https://github.com/shreyamhetre/PromptDock"
 
+# `uv sync` installs the dev group by default, which pulls in the `dev` extra.
 [dependency-groups]
-dev = [
-    "pytest>=8",
-    "testcontainers[postgres]>=4",
-    "ruff>=0.6",
-    "mypy>=1.10",
-    "pre-commit>=3.7",
-]
+dev = ["promptdock[dev]"]
 
 [build-system]
 requires = ["hatchling"]

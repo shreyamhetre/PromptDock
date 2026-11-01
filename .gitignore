@@ -13,3 +13,4 @@ htmlcov/
 node_modules/
 src/promptdock/ui/static/
 .promptdock-snapshot.json
+.venv-*/

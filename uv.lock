@@ -1521,6 +1521,17 @@ all = [
     { name = "mcp" },
     { name = "uvicorn", extra = ["standard"] },
 ]
+dev = [
+    { name = "fastapi" },
+    { name = "mcp" },
+    { name = "mypy" },
+    { name = "pre-commit", version = "4.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pre-commit", version = "4.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "testcontainers" },
+    { name = "uvicorn", extra = ["standard"] },
+]
 mcp = [
     { name = "mcp" },
 ]
@@ -1535,12 +1546,7 @@ ui = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "mypy" },
-    { name = "pre-commit", version = "4.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pre-commit", version = "4.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "testcontainers" },
+    { name = "promptdock", extra = ["dev"] },
 ]
 
 [package.metadata]
@@ -1550,24 +1556,24 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7" },
+    { name = "promptdock", extras = ["all"], marker = "extra == 'dev'" },
     { name = "promptdock", extras = ["server"], marker = "extra == 'ui'" },
     { name = "promptdock", extras = ["server", "ui", "mcp"], marker = "extra == 'all'" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },
     { name = "pydantic", specifier = ">=2.6" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "sqlalchemy", specifier = ">=2.0" },
+    { name = "testcontainers", extras = ["postgres"], marker = "extra == 'dev'", specifier = ">=4" },
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.29" },
 ]
-provides-extras = ["server", "ui", "mcp", "all"]
+provides-extras = ["server", "ui", "mcp", "all", "dev"]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.10" },
-    { name = "pre-commit", specifier = ">=3.7" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "ruff", specifier = ">=0.6" },
-    { name = "testcontainers", extras = ["postgres"], specifier = ">=4" },
-]
+dev = [{ name = "promptdock", extras = ["dev"] }]
 
 [[package]]
 name = "psycopg"
