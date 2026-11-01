@@ -36,7 +36,9 @@ class Backend(Protocol):
 
     def list_tags(self, project: str, name: str) -> list[Tag]: ...
 
-    def set_gate(self, project: str, name: str, tag: str, gate: Gate | None) -> Tag: ...
+    def set_gate(
+        self, project: str, name: str, tag: str, gate: Gate | None, actor: str | None
+    ) -> Tag: ...
 
     def promote(
         self,

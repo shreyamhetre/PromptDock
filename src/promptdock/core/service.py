@@ -198,13 +198,21 @@ def list_tags(session: Session, name: str, project: str = DEFAULT_PROJECT) -> li
 
 
 def set_gate(
-    session: Session, name: str, tag: str, gate: Gate | None, project: str = DEFAULT_PROJECT
+    session: Session,
+    name: str,
+    tag: str,
+    gate: Gate | None,
+    project: str = DEFAULT_PROJECT,
+    actor: str | None = None,
 ) -> Tag:
     """Attach a gate to a tag (creating the tag if needed), or remove it with ``None``."""
     prompt = _prompt_row(session, name, project)
     tag_row = _lock_or_create_tag(session, prompt, tag)
     tag_row.gate = gate.model_dump() if gate is not None else None
+    tag_row.updated_by = actor
+    tag_row.updated_at = func.now()
     session.flush()
+    session.refresh(tag_row)
     return _tag_model(tag_row, name, _version_numbers(session, prompt.id))
 
 

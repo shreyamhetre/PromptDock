@@ -27,7 +27,7 @@ promptdock migrate
 ```python
 from promptdock import Client
 
-client = Client()  # reads DATABASE_URL; or Client("postgresql://...")
+client = Client()  # reads DATABASE_URL; or Client("postgresql://...", actor="shreya")
 
 client.create_prompt("support-bot")
 client.create_version(
@@ -39,7 +39,7 @@ client.create_version(
     model_config={"model": "gpt-4o", "temperature": 0.2},
     commit_message="first version",
 )
-client.promote("support-bot", "prod", 1, actor="shreya")
+client.promote("support-bot", "prod", 1)  # recorded with actor = your OS username
 
 # In your app: always ask for a tag, never a hard-coded version.
 prompt = client.get_prompt("support-bot", tag="prod")

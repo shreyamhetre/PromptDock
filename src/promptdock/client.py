@@ -6,6 +6,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
+from promptdock.actor import default_actor
 from promptdock.backends.base import Backend
 from promptdock.cache import PromptCache
 from promptdock.config import DEFAULT_PROJECT
@@ -38,13 +39,17 @@ class Client:
 
     Server mode (talks to a ``promptdock serve`` instance)::
 
-        client = Client(base_url="https://prompts.internal", api_key="...")
+        client = Client(base_url="https://prompts.internal", token="...")
+        # token is only needed if the server sets PROMPTDOCK_TOKEN
 
     ``get_prompt`` results are cached for ``cache_ttl`` seconds (0 disables caching).
     If the database or server is unreachable, ``get_prompt`` returns the last version it
     fetched successfully and logs a warning. Set ``snapshot_path`` to also keep those
     copies in a JSON file, so a freshly started app can fall back to them.
     ``connect_timeout`` (seconds) bounds how long a call waits for an unreachable database.
+
+    ``actor`` is recorded as who made each change (new versions, promotes, rollbacks,
+    gates). It defaults to the OS username and is self-reported, like a git author.
     """
 
     def __init__(
@@ -52,7 +57,8 @@ class Client:
         db_url: str | None = None,
         *,
         base_url: str | None = None,
-        api_key: str | None = None,
+        token: str | None = None,
+        actor: str | None = None,
         project: str = DEFAULT_PROJECT,
         cache_ttl: float = DEFAULT_CACHE_TTL_S,
         snapshot_path: str | Path | None = None,
@@ -71,6 +77,7 @@ class Client:
 
         self._backend: Backend = DbBackend(db_url, connect_timeout)
         self.project = project
+        self.actor = actor if actor is not None else default_actor()
         self._cache = PromptCache(cache_ttl, snapshot_path)
 
     # --- reading prompts (cached, with fallback) -----------------------------------------
@@ -137,7 +144,7 @@ class Client:
         *,
         model_config: Mapping[str, Any] | None = None,
         commit_message: str | None = None,
-        created_by: str | None = None,
+        actor: str | None = None,
     ) -> PromptVersion:
         """Save a new version. ``template`` is a string, or a list of chat messages
         (``{"role": ..., "content": ...}``). Saving content identical to the latest
@@ -149,7 +156,7 @@ class Client:
                 "commit_message": commit_message,
             }
         )
-        version = self._backend.create_version(self.project, name, data, created_by)
+        version = self._backend.create_version(self.project, name, data, actor or self.actor)
         self._cache.invalidate(self._key(name, "latest"))
         return version
 
@@ -177,7 +184,9 @@ class Client:
     ) -> Tag:
         """Point ``tag`` at ``version``. Refused with ``GateFailedError`` if the tag's gate
         fails, unless ``force=True`` with a ``reason``."""
-        result = self._backend.promote(self.project, name, tag, version, actor, reason, force)
+        result = self._backend.promote(
+            self.project, name, tag, version, actor or self.actor, reason, force
+        )
         self._cache.invalidate(self._key(name, f"tag:{tag}"))
         return result
 
@@ -185,15 +194,22 @@ class Client:
         self, name: str, tag: str, *, actor: str | None = None, reason: str | None = None
     ) -> Tag:
         """Undo the tag's most recent promote; repeat to keep going back."""
-        result = self._backend.rollback(self.project, name, tag, actor, reason)
+        result = self._backend.rollback(self.project, name, tag, actor or self.actor, reason)
         self._cache.invalidate(self._key(name, f"tag:{tag}"))
         return result
 
-    def set_gate(self, name: str, tag: str, gate: Gate | Mapping[str, Any] | None) -> Tag:
+    def set_gate(
+        self,
+        name: str,
+        tag: str,
+        gate: Gate | Mapping[str, Any] | None,
+        *,
+        actor: str | None = None,
+    ) -> Tag:
         """Require eval results before ``tag`` can move, e.g.
         ``{"rules": [{"metric": "accuracy", "min": 0.85}]}``. ``None`` removes the gate."""
         parsed = Gate.model_validate(gate) if gate is not None else None
-        return self._backend.set_gate(self.project, name, tag, parsed)
+        return self._backend.set_gate(self.project, name, tag, parsed, actor or self.actor)
 
     def list_tag_events(self, name: str, tag: str | None = None) -> list[TagEvent]:
         """Every promote and rollback for the prompt (newest first), optionally one tag."""

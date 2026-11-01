@@ -23,6 +23,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Cache: 60 s TTL for tag lookups, versions cached forever; last-known-good fallback
   when the database is down, optional snapshot file for cold starts.
 - `examples/app.py` and `examples/tag.py`.
+- `Client(actor=...)`: who made each change (versions, promotes, rollbacks, gates);
+  defaults to the OS username, self-reported like a git author. `Client(token=...)` for
+  servers that set a shared token.
 
 ### Changed
 - Core API matches the revised plan: `create_version(..., actor=None)` saves the actor as

@@ -169,3 +169,42 @@ def test_config_errors(db_url: str) -> None:
         Client(base_url="http://x")
     with pytest.raises(ConfigError):
         Client(db_url, cache_ttl=-1)
+
+
+def test_actor_defaults_to_os_username(db_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("getpass.getuser", lambda: "os-user")
+    with Client(db_url) as c:
+        assert c.actor == "os-user"
+        _seed(c)
+        c.promote(NAME, "prod", 1)
+        assert c.list_versions(NAME)[0].created_by == "os-user"
+        assert c.list_tag_events(NAME, "prod")[0].actor == "os-user"
+
+
+def test_actor_setting_is_used_for_every_write(db_url: str) -> None:
+    with Client(db_url, actor="shreya") as c:
+        _seed(c)
+        c.set_gate(NAME, "prod", {"rules": [{"metric": "accuracy", "min": 0.5}]})
+        assert {t.name: t.updated_by for t in c.list_tags(NAME)}["prod"] == "shreya"
+        c.set_gate(NAME, "prod", None)
+
+        c.promote(NAME, "prod", 1)
+        c.promote(NAME, "prod", 2, actor="parth")  # per-call override
+        c.rollback(NAME, "prod", reason="bad")
+        events = c.list_tag_events(NAME, "prod")
+        assert [(e.action, e.actor) for e in events] == [
+            ("rollback", "shreya"),
+            ("promote", "parth"),
+            ("promote", "shreya"),
+        ]
+        assert {v.created_by for v in c.list_versions(NAME)} == {"shreya"}
+
+
+def test_unknown_os_user_records_no_actor(monkeypatch: pytest.MonkeyPatch) -> None:
+    from promptdock.actor import default_actor
+
+    def fail() -> str:
+        raise OSError("no user")
+
+    monkeypatch.setattr("getpass.getuser", fail)
+    assert default_actor() is None

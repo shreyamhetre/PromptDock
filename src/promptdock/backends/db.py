@@ -68,8 +68,10 @@ class DbBackend:
     def list_tags(self, project: str, name: str) -> list[Tag]:
         return self._run(lambda s: service.list_tags(s, name, project))
 
-    def set_gate(self, project: str, name: str, tag: str, gate: Gate | None) -> Tag:
-        return self._run(lambda s: service.set_gate(s, name, tag, gate, project))
+    def set_gate(
+        self, project: str, name: str, tag: str, gate: Gate | None, actor: str | None
+    ) -> Tag:
+        return self._run(lambda s: service.set_gate(s, name, tag, gate, project, actor))
 
     def promote(
         self,
