@@ -7,6 +7,9 @@
 
 The app always asks for a tag ("prod"), never a version number, so promoting or rolling
 back in PromptDock changes what it sends with no code change.
+
+From a checkout of this repo, run it with uv (which adds the SDK just for this run):
+    uv run --with anthropic python examples/anthropic_app.py ...
 """
 
 import sys

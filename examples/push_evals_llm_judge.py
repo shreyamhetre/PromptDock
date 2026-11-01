@@ -10,6 +10,9 @@ model_config, asks gpt-4o-mini to grade the answer 0-1 against a reference, and 
 two metrics: `accuracy` (mean grade, higher is better) and `latency_ms` (mean answer time,
 lower is better). Then: `promptdock leaderboard support-bot`, and gate prod on them with
 `promptdock gate set support-bot prod --min accuracy=0.8 --max latency_ms=3000`.
+
+From a checkout of this repo, run it with uv (which adds the SDK just for this run):
+    uv run --with openai python examples/push_evals_llm_judge.py ...
 """
 
 import json

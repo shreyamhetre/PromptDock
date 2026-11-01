@@ -7,6 +7,9 @@
 
 PromptDock renders the template (so its variable checks apply); LangChain receives plain
 messages. Swap ChatOpenAI for any LangChain chat model.
+
+From a checkout of this repo, run it with uv (which adds the SDK just for this run):
+    uv run --with langchain-openai python examples/langchain_app.py ...
 """
 
 import sys

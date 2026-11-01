@@ -4,6 +4,9 @@ pip install promptdock openai
 export DATABASE_URL=...            # or Client(base_url=...) for a PromptDock server
 export OPENAI_API_KEY=...
 python examples/openai_app.py "How do I reset my password?"
+
+From a checkout of this repo, run it with uv (which adds the SDK just for this run):
+    uv run --with openai python examples/openai_app.py ...
 """
 
 import sys
