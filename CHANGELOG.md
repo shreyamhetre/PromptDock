@@ -43,6 +43,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `GET /prompts/{name}/diff?a=&b=`, `Client.diff`, `promptdock diff`.
 - Promote warns when a version needs template variables the tag's current version did
   not; `strict=True` / `--strict` refuses instead.
+- Dashboard (`pip install promptdock[ui]`, `promptdock serve --ui`, at `/ui/`): prompts
+  list, versions, tags with promote (gate result shown, force with reason) and rollback
+  (confirm), sortable leaderboard with one score-over-versions chart per metric, diff of
+  two versions, audit log. Asks once for a name (X-Actor) and the token if needed.
 
 ### Changed
 - Gate rules: `min` means higher is better and `max` means lower is better (no separate

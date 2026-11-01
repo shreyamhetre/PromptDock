@@ -148,6 +148,9 @@ def serve(
         str, typer.Option(help="Interface to listen on. The default only allows this machine.")
     ] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on.")] = 8000,
+    ui: Annotated[
+        bool, typer.Option("--ui", help="Also serve the dashboard at /ui/ (needs the ui extra).")
+    ] = False,
     token: Annotated[
         str | None,
         typer.Option(
@@ -166,7 +169,7 @@ def serve(
         raise _fail("The server is not installed. Run: pip install 'promptdock[server]'") from None
 
     try:
-        server_app = create_app(database_url, token=token)
+        server_app = create_app(database_url, token=token, ui=ui)
     except PromptDockError as exc:
         raise _fail(str(exc)) from None
 
@@ -181,6 +184,8 @@ def serve(
         )
     lock = "token required" if token else "no token"
     typer.echo(f"PromptDock {__version__} ({lock}): API docs at http://{host}:{port}/docs")
+    if ui:
+        typer.echo(f"Dashboard at http://{host}:{port}/ui/")
     uvicorn.run(server_app, host=host, port=port)
 
 

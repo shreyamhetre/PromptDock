@@ -80,6 +80,19 @@ token: `PROMPTDOCK_TOKEN=... promptdock serve --host 0.0.0.0`. Every request exc
 `/health` must then send `Authorization: Bearer <token>`; clients pass `token=...` (or set
 `PROMPTDOCK_TOKEN`). Listening on `0.0.0.0` without a token prints a warning.
 
+## Dashboard
+
+```bash
+pip install "promptdock[ui]"
+promptdock serve --ui          # http://127.0.0.1:8000/ui/
+```
+
+Prompts list, versions and tags, a sortable leaderboard with a score-over-versions chart
+per metric, diffs between any two versions, and the audit log. You can promote (the gate
+result is shown) and roll back (with a confirm step). It asks once for your name (sent as
+`X-Actor`) and, if the server has one, the token; both stay in your browser. No Node is
+needed to run it.
+
 ## Command line
 
 The CLI connects like the client: `PROMPTDOCK_URL` (+ `PROMPTDOCK_TOKEN`) for a server,
@@ -109,7 +122,8 @@ bypasses a failing gate and is recorded. Rollback never runs the gate.
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). The dashboard source is in `ui/` (React + Vite + Recharts):
+`cd ui && npm ci && npm run build` writes the built files into `src/promptdock/ui/static/`.
 
 ## License
 
