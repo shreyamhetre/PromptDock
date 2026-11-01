@@ -405,3 +405,35 @@ def test_concurrent_version_creation_numbers_are_unique(engine: Engine) -> None:
 
     with Session(engine) as s:
         assert [v.version for v in service.list_versions(s, NAME)] == list(range(1, 9))
+
+
+def test_gates_saved_by_older_versions_still_load(session: Session) -> None:
+    """A gate stored with a field this version dropped must not break reading tags."""
+    from sqlalchemy import update
+
+    from promptdock.db.tables import Tag as TagRow
+
+    _with_versions(session, 1)
+    session.execute(
+        update(TagRow)
+        .where(TagRow.name == "prod")
+        .values(
+            gate={
+                "rules": [
+                    {"metric": "accuracy", "min": 0.85, "max": None, "higher_is_better": True}
+                ],
+                "require_better_than_current": False,
+            }
+        )
+    )
+    prod = {t.name: t for t in service.list_tags(session, NAME)}["prod"]
+    assert prod.gate is not None and prod.gate.rules[0].min == 0.85
+    with pytest.raises(GateFailedError, match="no eval result"):
+        service.promote(session, NAME, "prod", 1)
+
+
+def test_gates_sent_by_users_are_still_strict() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        Gate.model_validate({"rules": [{"metric": "accuracy", "min": 0.8, "mn": 1}]})

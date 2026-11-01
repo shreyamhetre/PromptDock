@@ -40,6 +40,7 @@ from promptdock.models import (
     EvalResult,
     EvalResultIn,
     Gate,
+    GateRule,
     PromptInfo,
     PromptVersion,
     PromptVersionCreate,
@@ -265,7 +266,7 @@ def promote(
 
     forced = False
     if tag_row.gate is not None:
-        gate = Gate.model_validate(tag_row.gate)
+        gate = _stored_gate(tag_row.gate)
         current = None if tag_row.version_id is None else latest_scores(session, tag_row.version_id)
         failures = evaluate_gate(gate, latest_scores(session, target.id), current)
         if failures and not force:
@@ -495,6 +496,18 @@ def _undo_target(events: Sequence[TagEventRow]) -> int | None:
     return None
 
 
+def _stored_gate(raw: dict[str, Any]) -> Gate:
+    """Load a gate saved in the database, ignoring fields this version no longer has
+    (e.g. ``higher_is_better`` from before ``min``/``max`` set the direction). Gates sent
+    by users are still validated strictly, so typos are rejected on the way in."""
+    rules = [
+        {k: v for k, v in rule.items() if k in GateRule.model_fields}
+        for rule in raw.get("rules", [])
+    ]
+    known = {k: v for k, v in raw.items() if k in Gate.model_fields}
+    return Gate.model_validate({**known, "rules": rules})
+
+
 def _version_numbers(session: Session, prompt_id: int) -> dict[int, int]:
     rows = session.execute(
         select(VersionRow.id, VersionRow.version).where(VersionRow.prompt_id == prompt_id)
@@ -542,7 +555,7 @@ def _tag_model(row: TagRow, prompt_name: str, numbers: dict[int, int]) -> Tag:
         prompt=prompt_name,
         name=row.name,
         version=numbers.get(row.version_id) if row.version_id is not None else None,
-        gate=Gate.model_validate(row.gate) if row.gate is not None else None,
+        gate=_stored_gate(row.gate) if row.gate is not None else None,
         updated_by=row.updated_by,
         updated_at=row.updated_at,
     )
