@@ -30,6 +30,7 @@ config = prompt.model_config
 llm = ChatOpenAI(
     model=config.get("model", "gpt-4o-mini"),
     temperature=config.get("temperature", 0.7),
+    max_tokens=config.get("max_tokens"),
 )
 reply = llm.invoke(messages)
 

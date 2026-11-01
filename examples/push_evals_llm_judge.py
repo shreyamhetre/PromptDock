@@ -62,6 +62,7 @@ for case in DATASET:
         model=config.get("model", "gpt-4o-mini"),
         messages=messages,  # type: ignore[arg-type]
         temperature=config.get("temperature", 0),
+        max_tokens=config.get("max_tokens"),
     )
     latencies.append((time.perf_counter() - started) * 1000)
     answer_text = answer.choices[0].message.content or ""
