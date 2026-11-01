@@ -15,7 +15,7 @@ import typer
 
 from promptdock import __version__
 from promptdock.config import DEFAULT_PROJECT
-from promptdock.errors import ConfigError, PromptDockError
+from promptdock.errors import PromptDockError
 
 if TYPE_CHECKING:
     from promptdock.client import Client
@@ -87,17 +87,10 @@ def _client(
     actor: str | None = None,
 ) -> Iterator["Client"]:
     """A Client for the CLI's connection settings; errors become a clean exit."""
-    from promptdock.client import Client
+    from promptdock.connect import connect
 
     try:
-        if url:
-            client = Client(base_url=url, token=token, project=project, actor=actor, cache_ttl=0)
-        elif database_url:
-            client = Client(database_url, project=project, actor=actor, cache_ttl=0)
-        else:
-            raise ConfigError(
-                "Not connected. Set PROMPTDOCK_URL (server mode) or DATABASE_URL (direct mode)"
-            )
+        client = connect(url, token, database_url, project, actor)
     except PromptDockError as exc:
         raise _fail(str(exc)) from None
     try:
@@ -606,3 +599,35 @@ def push(
         typer.echo(f"No .yaml files in {directory}")
     if failed:
         raise typer.Exit(code=1)
+
+
+# --- MCP -----------------------------------------------------------------------------------
+
+
+@app.command("mcp")
+def mcp_command(
+    allow_promote: Annotated[
+        bool,
+        typer.Option("--allow-promote", help="Let agents promote (gates still apply; no force)."),
+    ] = False,
+    url: ServerUrlOption = None,
+    token: TokenOption = None,
+    database_url: DatabaseUrlOption = None,
+    project: ProjectOption = DEFAULT_PROJECT,
+) -> None:
+    """Run a local MCP server over stdio for Claude Desktop, Cursor and other agents."""
+    try:
+        from promptdock.mcp.server import agent_actor, build_server
+    except ImportError:
+        raise _fail("MCP support is not installed. Run: pip install 'promptdock[mcp]'") from None
+
+    from promptdock.connect import connect
+
+    try:
+        client = connect(url, token, database_url, project, agent_actor())
+    except PromptDockError as exc:
+        raise _fail(str(exc)) from None
+    try:
+        build_server(client, allow_promote=allow_promote).run("stdio")
+    finally:
+        client.close()

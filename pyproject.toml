@@ -29,7 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 ui = ["promptdock[server]"]
-mcp = ["mcp>=1.0"]
+mcp = ["mcp>=2.3,<3"]
 all = ["promptdock[server,ui,mcp]"]
 dev = [
     "promptdock[all]",

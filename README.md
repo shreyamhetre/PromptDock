@@ -120,6 +120,29 @@ promptdock diff support-bot 3 7
 A gate uses the latest result per metric; a missing metric fails. `--force --reason ...`
 bypasses a failing gate and is recorded. Rollback never runs the gate.
 
+## AI agents (MCP)
+
+`pip install "promptdock[mcp]"`, then add PromptDock to your agent's MCP config. For
+Claude Desktop (`claude_desktop_config.json`) or Cursor (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "promptdock": {
+      "command": "promptdock",
+      "args": ["mcp"],
+      "env": { "DATABASE_URL": "postgresql://user:password@localhost:5432/promptdock" }
+    }
+  }
+}
+```
+
+Use `PROMPTDOCK_URL` (+ `PROMPTDOCK_TOKEN`) instead of `DATABASE_URL` to go through a
+server. Tools: `list_prompts`, `get_prompt`, `create_version`, `compare_versions`,
+`get_leaderboard`. `promote` is only offered with `"args": ["mcp", "--allow-promote"]`,
+gates still apply, and agents can never force. Agent changes are recorded with the actor
+`mcp:<your OS username>`.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). The dashboard source is in `ui/` (React + Vite + Recharts):

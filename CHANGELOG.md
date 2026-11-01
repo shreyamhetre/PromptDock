@@ -47,6 +47,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   list, versions, tags with promote (gate result shown, force with reason) and rollback
   (confirm), sortable leaderboard with one score-over-versions chart per metric, diff of
   two versions, audit log. Asks once for a name (X-Actor) and the token if needed.
+- MCP server (`pip install promptdock[mcp]`, `promptdock mcp`, stdio): `list_prompts`,
+  `get_prompt`, `create_version`, `compare_versions`, `get_leaderboard`, and `promote`
+  only with `--allow-promote` (never forced); actor `mcp:<OS username>`.
 
 ### Changed
 - Gate rules: `min` means higher is better and `max` means lower is better (no separate
