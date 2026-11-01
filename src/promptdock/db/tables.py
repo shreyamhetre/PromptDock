@@ -148,13 +148,3 @@ class EvalResult(Base):
         "metadata", JSONB, nullable=False, server_default="{}"
     )
     created_at: Mapped[datetime] = _created_at()
-
-
-class ApiKey(Base):
-    __tablename__ = "api_keys"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    key_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    scopes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
-    created_at: Mapped[datetime] = _created_at()

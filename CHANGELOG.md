@@ -7,8 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Project scaffold: packaging, lint, type checks, CI, local Postgres via docker-compose.
-- Database schema (projects, prompts, prompt_versions, tags, tag_events, eval_results,
-  api_keys) with Alembic migrations and a seeded `default` project.
+- Database schema (projects, prompts, prompt_versions, tags, tag_events, eval_results) with Alembic migrations and a seeded `default` project.
 - `promptdock migrate` command; `DATABASE_URL` validation (Postgres only).
 - Pydantic models: `PromptVersion`, `Tag`, `TagEvent`, `EvalResultIn`, `EvalResult`, `Gate`.
 - Core service: create prompts (with dev/preprod/prod tags) and versions (auto-numbered,
@@ -30,3 +29,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 - `tags.is_protected` (migration `0002`).
+- `api_keys` table (migration `0004`): no user accounts or API keys; servers use an
+  optional shared token instead.

@@ -16,18 +16,17 @@ EXPECTED_TABLES = {
     "tags",
     "tag_events",
     "eval_results",
-    "api_keys",
 }
 
 
 def test_upgrade_creates_all_tables_and_default_project(empty_db_url: str) -> None:
     assert migrate.current_revision(empty_db_url) is None
 
-    assert migrate.upgrade(empty_db_url) == "0003"
+    assert migrate.upgrade(empty_db_url) == "0004"
 
     engine = create_engine(empty_db_url)
     try:
-        assert set(inspect(engine).get_table_names()) >= EXPECTED_TABLES
+        assert set(inspect(engine).get_table_names()) == EXPECTED_TABLES | {"alembic_version"}
         with engine.connect() as conn:
             assert conn.execute(text("SELECT name FROM projects")).scalars().all() == ["default"]
     finally:
@@ -36,7 +35,7 @@ def test_upgrade_creates_all_tables_and_default_project(empty_db_url: str) -> No
 
 def test_upgrade_is_idempotent(empty_db_url: str) -> None:
     migrate.upgrade(empty_db_url)
-    assert migrate.upgrade(empty_db_url) == "0003"
+    assert migrate.upgrade(empty_db_url) == "0004"
 
 
 def test_migrations_match_table_definitions(empty_db_url: str) -> None:
@@ -84,7 +83,7 @@ def test_constraints_are_enforced(empty_db_url: str) -> None:
 def test_cli_migrate(empty_db_url: str) -> None:
     result = CliRunner().invoke(app, ["migrate", "--database-url", empty_db_url])
     assert result.exit_code == 0, result.output
-    assert "revision 0003" in result.stdout
+    assert "revision 0004" in result.stdout
 
 
 def test_cli_migrate_reads_env(empty_db_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
