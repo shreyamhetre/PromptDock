@@ -28,16 +28,18 @@ def test_require_better_than_current() -> None:
     gate = Gate(
         rules=[
             GateRule(metric="accuracy", min=0.5),
-            GateRule(metric="latency_ms", max=5000, higher_is_better=False),
+            GateRule(metric="latency_ms", max=5000),
         ],
         require_better_than_current=True,
     )
     current = {"accuracy": 0.9, "latency_ms": 900}
 
     assert evaluate_gate(gate, {"accuracy": 0.95, "latency_ms": 800}, current) == []
-    assert evaluate_gate(gate, {"accuracy": 0.9, "latency_ms": 1000}, current) == [
-        "accuracy: 0.9 is not better than the current version's 0.9",
-        "latency_ms: 1000 is not better than the current version's 900",
+    # "At least as good": equal scores pass.
+    assert evaluate_gate(gate, {"accuracy": 0.9, "latency_ms": 900}, current) == []
+    assert evaluate_gate(gate, {"accuracy": 0.89, "latency_ms": 1000}, current) == [
+        "accuracy: 0.89 is worse than the current version's 0.9",
+        "latency_ms: 1000 is worse than the current version's 900",
     ]
 
 

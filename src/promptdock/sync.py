@@ -210,7 +210,8 @@ def _push_one(
         )
         if tag is not None:
             try:
-                client.promote(name, tag, created.version, reason=f"push {path.name}")
+                moved = client.promote(name, tag, created.version, reason=f"push {path.name}")
+                warning = "; ".join(filter(None, [warning, *moved.warnings])) or None
             except PromptDockError as exc:
                 error = f"created v{created.version} but did not move '{tag}': {exc}"
                 return PushResult(name, status, created.version, None, warning, error)

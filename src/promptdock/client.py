@@ -17,11 +17,13 @@ from promptdock.models import (
     EvalResult,
     EvalResultIn,
     Gate,
+    Leaderboard,
     PromptInfo,
     PromptVersion,
     PromptVersionCreate,
     Tag,
     TagEvent,
+    VersionDiff,
 )
 from promptdock.prompt import Prompt
 
@@ -191,11 +193,13 @@ class Client:
         actor: str | None = None,
         force: bool = False,
         reason: str | None = None,
+        strict: bool = False,
     ) -> Tag:
         """Point ``tag`` at ``version``. Refused with ``GateFailedError`` if the tag's gate
-        fails, unless ``force=True`` with a ``reason``."""
+        fails, unless ``force=True`` with a ``reason``. If the version needs new template
+        variables, the returned tag has ``warnings``; ``strict=True`` refuses instead."""
         result = self._backend.promote(
-            self.project, name, tag, version, actor or self.actor, reason, force
+            self.project, name, tag, version, actor or self.actor, reason, force, strict
         )
         self._cache.invalidate(self._key(name, f"tag:{tag}"))
         return result
@@ -224,6 +228,19 @@ class Client:
     def list_tag_events(self, name: str, tag: str | None = None) -> list[TagEvent]:
         """Every promote and rollback for the prompt (newest first), optionally one tag."""
         return self._backend.list_tag_events(self.project, name, tag)
+
+    # --- comparing versions ---------------------------------------------------------------
+
+    def get_leaderboard(
+        self, name: str, *, sort_by: str = "version", descending: bool = True
+    ) -> Leaderboard:
+        """Versions x metrics with the latest score per metric. ``sort_by`` is
+        ``version``, ``created_at`` or a metric name."""
+        return self._backend.leaderboard(self.project, name, sort_by, descending)
+
+    def diff(self, name: str, a: int, b: int) -> VersionDiff:
+        """Template text diff and model_config/variable changes between two versions."""
+        return self._backend.diff(self.project, name, a, b)
 
     # --- eval results ---------------------------------------------------------------------
 

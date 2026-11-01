@@ -35,8 +35,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI: `prompts list`, `versions list|show`, `promote`, `rollback`, `history`,
   `evals push results.jsonl`, `export ./prompts`, `push ./prompts [--tag dev] [--dry-run]`;
   `--actor` / `--reason` on writes; connects via `PROMPTDOCK_URL` or `DATABASE_URL`.
+- Eval gates from the CLI: `promptdock gate set NAME TAG --min accuracy=0.85 --max
+  latency_ms=1200 [--require-better-than-current]`, `gate show`, `gate clear`.
+- Leaderboard (versions x metrics, latest score per metric, sort by any column):
+  `GET /prompts/{name}/leaderboard`, `Client.get_leaderboard`, `promptdock leaderboard`.
+- Diff of two versions (template text, model_config, variables):
+  `GET /prompts/{name}/diff?a=&b=`, `Client.diff`, `promptdock diff`.
+- Promote warns when a version needs template variables the tag's current version did
+  not; `strict=True` / `--strict` refuses instead.
 
 ### Changed
+- Gate rules: `min` means higher is better and `max` means lower is better (no separate
+  `higher_is_better` setting); `require_better_than_current` passes when a metric is at
+  least as good as the current version's.
 - Core API matches the revised plan: `create_version(..., actor=None)` saves the actor as
   `created_by`; `list_tag_events(name, tag)`; `promote(name, tag, version, actor, reason,
   force)`.

@@ -327,7 +327,7 @@ def test_require_better_than_current(session: Session) -> None:
     service.add_eval_results(session, _evals(3, accuracy=0.9))
 
     service.promote(session, NAME, "prod", 1)
-    with pytest.raises(GateFailedError, match="not better than"):
+    with pytest.raises(GateFailedError, match="worse than"):
         service.promote(session, NAME, "prod", 2)
     service.promote(session, NAME, "prod", 3)
 

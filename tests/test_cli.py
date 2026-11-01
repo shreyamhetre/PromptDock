@@ -214,3 +214,47 @@ def test_evals_push_rejects_bad_lines(direct: str, tmp_path: Path) -> None:
     bad.write_text('{"prompt": "x", "version": 1, "metric": "m", "score": "high"}\n')
     result = run("evals", "push", str(bad))
     assert result.exit_code == 1 and "line 1" in result.output
+
+
+def test_gate_leaderboard_diff_commands(direct: str, tmp_path: Path) -> None:
+    prompts = tmp_path / "prompts"
+    _write(prompts, NAME, "Hi {{ user }}", model_config={"temperature": 0})
+    ok("push", str(prompts))
+    _write(prompts, NAME, "Hi {{ user }} about {{ product }}", model_config={"temperature": 1})
+    ok("push", str(prompts))
+    evals = tmp_path / "results.jsonl"
+    evals.write_text(
+        "\n".join(
+            json.dumps({"prompt": NAME, "version": v, "metric": m, "score": s})
+            for v, m, s in [(1, "accuracy", 0.9), (2, "accuracy", 0.8), (2, "latency_ms", 700)]
+        )
+    )
+    ok("evals", "push", str(evals))
+
+    # gate set / show / refusal / clear
+    out = ok("gate", "set", NAME, "prod", "--min", "accuracy=0.85", "--max", "latency_ms=1200")
+    assert "accuracy >= 0.85" in out and "latency_ms <= 1200" in out
+    assert "accuracy >= 0.85" in ok("gate", "show", NAME, "prod")
+    refused = run("promote", NAME, "prod", "2")
+    assert refused.exit_code == 1
+    assert "accuracy: 0.8 is below the minimum 0.85" in refused.output
+    assert run("gate", "set", NAME, "prod", "--min", "accuracy").exit_code == 1
+    ok("gate", "clear", NAME, "prod")
+    assert "no gate" in ok("gate", "show", NAME, "prod")
+
+    # promote warns about new variables; --strict refuses
+    ok("promote", NAME, "prod", "1")
+    strict = run("promote", NAME, "prod", "2", "--strict")
+    assert strict.exit_code == 1 and "needs variables" in strict.output
+    warned = ok("promote", NAME, "prod", "2")
+    assert "warning: v2 needs variables that v1" in warned and "product" in warned
+
+    # leaderboard sorted by a metric, diff with config changes
+    board = ok("leaderboard", NAME, "--sort", "accuracy").splitlines()
+    assert "accuracy" in board[0] and "latency_ms" in board[0]
+    assert board[1].startswith("v1") and board[2].startswith("v2 ")
+    assert "prod" in board[2] and "700" in board[2]
+    changes = ok("diff", NAME, "1", "2")
+    assert "+Hi {{ user }} about {{ product }}" in changes
+    assert "model_config.temperature: 0 -> 1" in changes
+    assert "variables added: product" in changes

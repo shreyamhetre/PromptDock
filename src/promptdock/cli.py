@@ -19,12 +19,17 @@ from promptdock.errors import ConfigError, PromptDockError
 
 if TYPE_CHECKING:
     from promptdock.client import Client
+    from promptdock.models import Gate
 
 app = typer.Typer(help="PromptDock: prompt versioning.", no_args_is_help=True)
 versions_app = typer.Typer(help="Inspect versions.", no_args_is_help=True)
 prompts_app = typer.Typer(help="Inspect prompts.", no_args_is_help=True)
 evals_app = typer.Typer(help="Send eval results.", no_args_is_help=True)
+gate_app = typer.Typer(
+    help="Eval gates that must pass before a tag can move.", no_args_is_help=True
+)
 app.add_typer(versions_app, name="versions")
+app.add_typer(gate_app, name="gate")
 app.add_typer(prompts_app, name="prompts")
 app.add_typer(evals_app, name="evals")
 
@@ -280,6 +285,10 @@ def promote(
     force: Annotated[
         bool, typer.Option("--force", help="Bypass a failing gate (needs --reason).")
     ] = False,
+    strict: Annotated[
+        bool,
+        typer.Option("--strict", help="Refuse if the version needs new template variables."),
+    ] = False,
     actor: ActorOption = None,
     reason: ReasonOption = None,
     url: ServerUrlOption = None,
@@ -289,8 +298,10 @@ def promote(
 ) -> None:
     """Point a tag at a version (checked against the tag's eval gate)."""
     with _client(url, token, database_url, project, actor) as client:
-        result = client.promote(name, tag, version, reason=reason, force=force)
+        result = client.promote(name, tag, version, reason=reason, force=force, strict=strict)
         typer.echo(f"{name}: {tag} -> {_v(result.version)}")
+        for warning in result.warnings:
+            typer.secho(f"warning: {warning}", fg=typer.colors.YELLOW)
 
 
 @app.command()
@@ -308,6 +319,185 @@ def rollback(
     with _client(url, token, database_url, project, actor) as client:
         result = client.rollback(name, tag, reason=reason)
         typer.echo(f"{name}: {tag} rolled back -> {_v(result.version)}")
+
+
+# --- gates ---------------------------------------------------------------------------------
+
+
+def _parse_bounds(values: list[str] | None, option: str) -> dict[str, float]:
+    bounds: dict[str, float] = {}
+    for item in values or []:
+        metric, sep, number = item.partition("=")
+        try:
+            if not sep or not metric:
+                raise ValueError
+            bounds[metric] = float(number)
+        except ValueError:
+            raise _fail(f"{option} expects metric=number, e.g. {option} accuracy=0.85") from None
+    return bounds
+
+
+@gate_app.command("set")
+def gate_set(
+    name: Annotated[str, typer.Argument(help="Prompt name.")],
+    tag: Annotated[str, typer.Argument(help="Tag the gate protects, e.g. prod.")],
+    min_: Annotated[
+        list[str] | None,
+        typer.Option("--min", help="metric=value; higher is better (repeatable)."),
+    ] = None,
+    max_: Annotated[
+        list[str] | None,
+        typer.Option("--max", help="metric=value; lower is better (repeatable)."),
+    ] = None,
+    require_better: Annotated[
+        bool,
+        typer.Option(
+            "--require-better-than-current",
+            help="Each metric must also be at least as good as the version the tag has now.",
+        ),
+    ] = False,
+    actor: ActorOption = None,
+    url: ServerUrlOption = None,
+    token: TokenOption = None,
+    database_url: DatabaseUrlOption = None,
+    project: ProjectOption = DEFAULT_PROJECT,
+) -> None:
+    """Replace the tag's gate, e.g. --min accuracy=0.85 --max latency_ms=1200."""
+    from promptdock.models import Gate, GateRule
+
+    mins, maxes = _parse_bounds(min_, "--min"), _parse_bounds(max_, "--max")
+    if not mins and not maxes:
+        raise _fail("give at least one --min or --max rule (use `gate clear` to remove a gate)")
+    try:
+        gate = Gate(
+            rules=[
+                GateRule(metric=m, min=mins.get(m), max=maxes.get(m))
+                for m in sorted(set(mins) | set(maxes))
+            ],
+            require_better_than_current=require_better,
+        )
+    except ValueError as exc:
+        raise _fail(str(exc)) from None
+    with _client(url, token, database_url, project, actor) as client:
+        client.set_gate(name, tag, gate)
+        typer.echo(f"{name}: gate on '{tag}' set:")
+        _print_gate(gate)
+
+
+@gate_app.command("show")
+def gate_show(
+    name: Annotated[str, typer.Argument(help="Prompt name.")],
+    tag: Annotated[str, typer.Argument(help="Tag.")],
+    url: ServerUrlOption = None,
+    token: TokenOption = None,
+    database_url: DatabaseUrlOption = None,
+    project: ProjectOption = DEFAULT_PROJECT,
+) -> None:
+    """Show the gate on a tag."""
+    with _client(url, token, database_url, project) as client:
+        found = {t.name: t for t in client.list_tags(name)}.get(tag)
+        if found is None or found.gate is None:
+            typer.echo(f"{name}: no gate on '{tag}'")
+            return
+        typer.echo(f"{name}: gate on '{tag}':")
+        _print_gate(found.gate)
+
+
+@gate_app.command("clear")
+def gate_clear(
+    name: Annotated[str, typer.Argument(help="Prompt name.")],
+    tag: Annotated[str, typer.Argument(help="Tag.")],
+    actor: ActorOption = None,
+    url: ServerUrlOption = None,
+    token: TokenOption = None,
+    database_url: DatabaseUrlOption = None,
+    project: ProjectOption = DEFAULT_PROJECT,
+) -> None:
+    """Remove the gate from a tag."""
+    with _client(url, token, database_url, project, actor) as client:
+        client.set_gate(name, tag, None)
+        typer.echo(f"{name}: gate on '{tag}' removed")
+
+
+def _print_gate(gate: "Gate") -> None:
+    for rule in gate.rules:
+        parts = []
+        if rule.min is not None:
+            parts.append(f">= {rule.min:g}")
+        if rule.max is not None:
+            parts.append(f"<= {rule.max:g}")
+        typer.echo(f"  {rule.metric} {' and '.join(parts)}")
+    if gate.require_better_than_current:
+        typer.echo("  and at least as good as the version the tag points to now")
+
+
+# --- comparing versions --------------------------------------------------------------------
+
+
+@app.command()
+def leaderboard(
+    name: Annotated[str, typer.Argument(help="Prompt name.")],
+    sort: Annotated[
+        str, typer.Option(help="Column to sort by: version, created_at or a metric.")
+    ] = "version",
+    asc: Annotated[bool, typer.Option("--asc", help="Sort ascending.")] = False,
+    url: ServerUrlOption = None,
+    token: TokenOption = None,
+    database_url: DatabaseUrlOption = None,
+    project: ProjectOption = DEFAULT_PROJECT,
+) -> None:
+    """Versions x metrics with the latest score per metric."""
+    with _client(url, token, database_url, project) as client:
+        board = client.get_leaderboard(name, sort_by=sort, descending=not asc)
+    width = max([12, *(len(m) + 2 for m in board.metrics)])
+    header = f"{'version':<8} {'tags':<16}" + "".join(f"{m:>{width}}" for m in board.metrics)
+    typer.echo(header)
+    for row in board.rows:
+        cells = "".join(
+            f"{'-' if row.scores[m] is None else format(row.scores[m], 'g'):>{width}}"
+            for m in board.metrics
+        )
+        typer.echo(f"{_v(row.version):<8} {', '.join(row.tags):<16}{cells}")
+
+
+@app.command()
+def diff(
+    name: Annotated[str, typer.Argument(help="Prompt name.")],
+    a: Annotated[int, typer.Argument(help="Older version.")],
+    b: Annotated[int, typer.Argument(help="Newer version.")],
+    url: ServerUrlOption = None,
+    token: TokenOption = None,
+    database_url: DatabaseUrlOption = None,
+    project: ProjectOption = DEFAULT_PROJECT,
+) -> None:
+    """Show what changed between two versions: template text and model_config."""
+    with _client(url, token, database_url, project) as client:
+        result = client.diff(name, a, b)
+    if result.template_changed:
+        for line in result.template_diff.splitlines():
+            color = (
+                typer.colors.GREEN
+                if line.startswith("+") and not line.startswith("+++")
+                else typer.colors.RED
+                if line.startswith("-") and not line.startswith("---")
+                else None
+            )
+            typer.secho(line, fg=color)
+    else:
+        typer.echo("template: unchanged")
+    for change in result.model_config_changes:
+        if change.change == "added":
+            typer.echo(f"model_config.{change.key}: added {json.dumps(change.b)}")
+        elif change.change == "removed":
+            typer.echo(f"model_config.{change.key}: removed (was {json.dumps(change.a)})")
+        else:
+            typer.echo(
+                f"model_config.{change.key}: {json.dumps(change.a)} -> {json.dumps(change.b)}"
+            )
+    if result.variables_added:
+        typer.echo(f"variables added: {', '.join(result.variables_added)}")
+    if result.variables_removed:
+        typer.echo(f"variables removed: {', '.join(result.variables_removed)}")
 
 
 # --- evals ---------------------------------------------------------------------------------

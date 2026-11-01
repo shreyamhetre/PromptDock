@@ -27,6 +27,7 @@ from promptdock.errors import (
     AlreadyExistsError,
     GateFailedError,
     InvalidInputError,
+    NewVariablesError,
     NothingToRollBackError,
     PromptNotFoundError,
     TagNotFoundError,
@@ -225,6 +226,7 @@ def promote(
     reason: str | None = None,
     force: bool = False,
     project: str = DEFAULT_PROJECT,
+    strict: bool = False,
 ) -> Tag:
     """Point ``tag`` at ``version``, creating custom tags on first use.
 
@@ -232,6 +234,10 @@ def promote(
     ``force=True`` bypasses a failing gate but requires a ``reason``; the bypass is
     recorded in the tag's history. Promoting to the version the tag already points to
     changes nothing.
+
+    If the new version needs variables the tag's current version does not, the returned
+    tag carries a warning (apps reading this tag must start passing them); with
+    ``strict=True`` the promote is refused with ``NewVariablesError`` instead.
     """
     if force and not (reason and reason.strip()):
         raise InvalidInputError("force=True requires a reason")
@@ -244,6 +250,19 @@ def promote(
     if tag_row.version_id == target.id:
         return _tag_model(tag_row, name, numbers)
 
+    warnings: list[str] = []
+    if tag_row.version_id is not None:
+        current_version = session.get_one(VersionRow, tag_row.version_id)
+        new_vars = sorted(set(target.variables) - set(current_version.variables))
+        if new_vars:
+            message = (
+                f"v{target.version} needs variables that v{current_version.version} "
+                f"(current '{tag}') did not: {', '.join(new_vars)}"
+            )
+            if strict:
+                raise NewVariablesError(f"Refused (strict): {message}")
+            warnings.append(message + "; make sure apps reading this tag pass them")
+
     forced = False
     if tag_row.gate is not None:
         gate = Gate.model_validate(tag_row.gate)
@@ -254,7 +273,7 @@ def promote(
         forced = bool(failures)
 
     _move_tag(session, tag_row, target.id, "promote", actor, reason, forced)
-    return _tag_model(tag_row, name, numbers)
+    return _tag_model(tag_row, name, numbers).model_copy(update={"warnings": warnings})
 
 
 def rollback(

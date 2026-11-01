@@ -14,6 +14,7 @@ from promptdock.errors import (
     AuthenticationError,
     GateFailedError,
     InvalidInputError,
+    NewVariablesError,
     NotFoundError,
     NothingToRollBackError,
     PromptDockError,
@@ -27,6 +28,7 @@ STATUS_CODES: list[tuple[type[PromptDockError], int]] = [
     (AlreadyExistsError, 409),
     (GateFailedError, 409),
     (NothingToRollBackError, 409),
+    (NewVariablesError, 409),
     (InvalidInputError, 422),
     (UnavailableError, 503),
 ]

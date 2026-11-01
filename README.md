@@ -98,6 +98,15 @@ promptdock history support-bot prod
 
 `push` never overwrites anything and never moves `prod`; promote to `prod` explicitly.
 
+```bash
+promptdock gate set support-bot prod --min accuracy=0.85 --max latency_ms=1200
+promptdock leaderboard support-bot --sort accuracy
+promptdock diff support-bot 3 7
+```
+
+A gate uses the latest result per metric; a missing metric fails. `--force --reason ...`
+bypasses a failing gate and is recorded. Rollback never runs the gate.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

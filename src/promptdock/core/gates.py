@@ -14,8 +14,9 @@ def evaluate_gate(
 
     ``scores`` holds the latest score per metric for the candidate version and
     ``current_scores`` the same for the version the tag points to now (None if unset).
-    A missing metric fails. ``require_better_than_current`` only compares metrics the
-    current version also has a score for.
+    A missing metric fails. With ``require_better_than_current`` every metric in the rules
+    must be at least as good as the current version's (higher for ``min`` rules, lower
+    for ``max``-only rules); metrics the current version has no score for are skipped.
     """
     failures: list[str] = []
     for rule in gate.rules:
@@ -31,9 +32,9 @@ def evaluate_gate(
             current = current_scores.get(rule.metric)
             if current is None:
                 continue
-            better = score > current if rule.higher_is_better else score < current
-            if not better:
+            as_good = score >= current if rule.higher_is_better else score <= current
+            if not as_good:
                 failures.append(
-                    f"{rule.metric}: {score:g} is not better than the current version's {current:g}"
+                    f"{rule.metric}: {score:g} is worse than the current version's {current:g}"
                 )
     return failures

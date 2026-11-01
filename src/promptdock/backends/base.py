@@ -7,11 +7,13 @@ from promptdock.models import (
     EvalResult,
     EvalResultIn,
     Gate,
+    Leaderboard,
     PromptInfo,
     PromptVersion,
     PromptVersionCreate,
     Tag,
     TagEvent,
+    VersionDiff,
 )
 
 
@@ -49,6 +51,7 @@ class Backend(Protocol):
         actor: str | None,
         reason: str | None,
         force: bool,
+        strict: bool,
     ) -> Tag: ...
 
     def rollback(
@@ -58,6 +61,12 @@ class Backend(Protocol):
     def list_tag_events(self, project: str, name: str, tag: str | None) -> list[TagEvent]: ...
 
     def add_eval_results(self, results: Sequence[EvalResultIn]) -> list[EvalResult]: ...
+
+    def leaderboard(
+        self, project: str, name: str, sort_by: str, descending: bool
+    ) -> Leaderboard: ...
+
+    def diff(self, project: str, name: str, a: int, b: int) -> VersionDiff: ...
 
     def get_eval_results(
         self, project: str, name: str, version: int | None

@@ -69,6 +69,7 @@ def test_gate_matches_plan_example() -> None:
         }
     )
     assert gate.rules[0].higher_is_better is True
+    assert gate.rules[1].higher_is_better is False
     assert gate.rules[1].max == 1200
 
 

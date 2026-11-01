@@ -7,18 +7,20 @@ from typing import TypeVar
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.orm import Session
 
-from promptdock.core import service
+from promptdock.core import compare, service
 from promptdock.db.engine import make_engine
 from promptdock.errors import DatabaseUnavailableError
 from promptdock.models import (
     EvalResult,
     EvalResultIn,
     Gate,
+    Leaderboard,
     PromptInfo,
     PromptVersion,
     PromptVersionCreate,
     Tag,
     TagEvent,
+    VersionDiff,
 )
 
 T = TypeVar("T")
@@ -83,9 +85,12 @@ class DbBackend:
         actor: str | None,
         reason: str | None,
         force: bool,
+        strict: bool,
     ) -> Tag:
         return self.run(
-            lambda s: service.promote(s, name, tag, version, actor, reason, force, project)
+            lambda s: service.promote(
+                s, name, tag, version, actor, reason, force, project, strict=strict
+            )
         )
 
     def rollback(
@@ -98,6 +103,12 @@ class DbBackend:
 
     def add_eval_results(self, results: Sequence[EvalResultIn]) -> list[EvalResult]:
         return self.run(lambda s: service.add_eval_results(s, results))
+
+    def leaderboard(self, project: str, name: str, sort_by: str, descending: bool) -> Leaderboard:
+        return self.run(lambda s: compare.leaderboard(s, name, sort_by, descending, project))
+
+    def diff(self, project: str, name: str, a: int, b: int) -> VersionDiff:
+        return self.run(lambda s: compare.diff(s, name, a, b, project))
 
     def get_eval_results(self, project: str, name: str, version: int | None) -> list[EvalResult]:
         return self.run(lambda s: service.get_eval_results(s, name, version, project))

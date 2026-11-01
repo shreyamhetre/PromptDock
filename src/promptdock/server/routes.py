@@ -1,6 +1,6 @@
 """REST endpoints. Routes only translate HTTP into calls to the backend and core."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, Query, Response, status
 from sqlalchemy import text
@@ -11,6 +11,7 @@ from promptdock.models import (
     CreatePromptRequest,
     EvalResult,
     EvalResultIn,
+    Leaderboard,
     PromoteRequest,
     PromptInfo,
     PromptVersion,
@@ -19,6 +20,7 @@ from promptdock.models import (
     SetGateRequest,
     Tag,
     TagEvent,
+    VersionDiff,
 )
 from promptdock.server.access import Actor, Backend
 
@@ -133,7 +135,9 @@ def promote(
 ) -> Tag:
     """Point the tag at a version. Refused with 409 if the tag's gate fails, unless
     ``force`` is true and a ``reason`` is given."""
-    return backend.promote(project, name, tag, body.version, actor, body.reason, body.force)
+    return backend.promote(
+        project, name, tag, body.version, actor, body.reason, body.force, body.strict
+    )
 
 
 @router.post("/prompts/{name}/tags/{tag}/rollback", tags=["tags"])
@@ -177,6 +181,29 @@ def set_gate(
 ) -> Tag:
     """Set the eval gate for a tag; ``{"gate": null}`` removes it."""
     return backend.set_gate(project, name, tag, body.gate, actor)
+
+
+# --- comparing versions ------------------------------------------------------------------
+
+
+@router.get("/prompts/{name}/leaderboard", tags=["compare"])
+def get_leaderboard(
+    name: str,
+    backend: Backend,
+    sort: Annotated[str, Query(description="version, created_at or a metric name")] = "version",
+    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
+    project: Project = DEFAULT_PROJECT,
+) -> Leaderboard:
+    """Every version x metric with the latest score; sort by any column."""
+    return backend.leaderboard(project, name, sort, order == "desc")
+
+
+@router.get("/prompts/{name}/diff", tags=["compare"])
+def get_diff(
+    name: str, a: int, b: int, backend: Backend, project: Project = DEFAULT_PROJECT
+) -> VersionDiff:
+    """Text diff of two versions' templates plus model_config and variable changes."""
+    return backend.diff(project, name, a, b)
 
 
 # --- evals -------------------------------------------------------------------------------

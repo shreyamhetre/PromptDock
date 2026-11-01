@@ -13,6 +13,7 @@ from promptdock.models import (
     EvalResult,
     EvalResultIn,
     Gate,
+    Leaderboard,
     PromoteRequest,
     PromptInfo,
     PromptVersion,
@@ -21,6 +22,7 @@ from promptdock.models import (
     SetGateRequest,
     Tag,
     TagEvent,
+    VersionDiff,
 )
 
 M = TypeVar("M", bound=BaseModel)
@@ -109,8 +111,9 @@ class HttpBackend:
         actor: str | None,
         reason: str | None,
         force: bool,
+        strict: bool,
     ) -> Tag:
-        body = PromoteRequest(version=version, reason=reason, force=force)
+        body = PromoteRequest(version=version, reason=reason, force=force, strict=strict)
         path = f"/prompts/{_q(name)}/tags/{_q(tag)}"
         return self._call(Tag, "PUT", path, project, json=_dump(body), headers=_actor(actor))
 
@@ -133,6 +136,15 @@ class HttpBackend:
     def add_eval_results(self, results: Sequence[EvalResultIn]) -> list[EvalResult]:
         body = [_dump(r) for r in results]
         return self._call_list(EvalResult, "POST", "/evals", None, json=body)
+
+    def leaderboard(self, project: str, name: str, sort_by: str, descending: bool) -> Leaderboard:
+        params = {"sort": sort_by, "order": "desc" if descending else "asc"}
+        path = f"/prompts/{_q(name)}/leaderboard"
+        return self._call(Leaderboard, "GET", path, project, params=params)
+
+    def diff(self, project: str, name: str, a: int, b: int) -> VersionDiff:
+        path = f"/prompts/{_q(name)}/diff"
+        return self._call(VersionDiff, "GET", path, project, params={"a": a, "b": b})
 
     def get_eval_results(self, project: str, name: str, version: int | None) -> list[EvalResult]:
         params = {"version": version} if version is not None else {}

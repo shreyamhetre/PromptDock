@@ -86,10 +86,17 @@ class PromptVersion(_Model):
 
 
 class GateRule(_Model):
+    """``min`` means higher is better; ``max`` means lower is better."""
+
     metric: str = Field(min_length=1)
     min: float | None = None
     max: float | None = None
-    higher_is_better: bool = True
+
+    @property
+    def higher_is_better(self) -> bool:
+        """Direction for ``require_better_than_current``: a rule with a ``min`` is a
+        higher-is-better metric; a rule with only a ``max`` is lower-is-better."""
+        return self.min is not None
 
     @model_validator(mode="after")
     def _has_bound(self) -> "GateRule":
@@ -113,6 +120,8 @@ class Tag(_Model):
     gate: Gate | None = None
     updated_by: str | None = None
     updated_at: datetime
+    # Set by promote only, e.g. when the new version needs variables the old one did not.
+    warnings: list[str] = Field(default_factory=list)
 
 
 class TagEvent(_Model):
@@ -173,6 +182,7 @@ class PromoteRequest(_Model):
     version: int = Field(ge=1)
     reason: str | None = None
     force: bool = False
+    strict: bool = False
 
 
 class RollbackRequest(_Model):
@@ -181,3 +191,44 @@ class RollbackRequest(_Model):
 
 class SetGateRequest(_Model):
     gate: Gate | None
+
+
+# --- comparing versions ----------------------------------------------------------------
+
+
+class LeaderboardRow(_Model):
+    version: int
+    created_at: datetime
+    created_by: str | None = None
+    commit_message: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    scores: dict[str, float | None] = Field(default_factory=dict)
+
+
+class Leaderboard(_Model):
+    """Versions x metrics, latest score per metric. ``scores`` has every metric in
+    ``metrics``; None means the version has no result for it."""
+
+    prompt: str
+    metrics: list[str]
+    sort_by: str
+    descending: bool
+    rows: list[LeaderboardRow]
+
+
+class ConfigChange(_Model):
+    key: str
+    change: Literal["added", "removed", "changed"]
+    a: Any = None
+    b: Any = None
+
+
+class VersionDiff(_Model):
+    prompt: str
+    a: int
+    b: int
+    template_changed: bool
+    template_diff: str
+    model_config_changes: list[ConfigChange]
+    variables_added: list[str]
+    variables_removed: list[str]

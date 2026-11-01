@@ -71,6 +71,10 @@ class GateFailedError(PromptDockError):
         )
 
 
+class NewVariablesError(PromptDockError):
+    """A strict promote was refused: the version needs variables the current one does not."""
+
+
 class NothingToRollBackError(PromptDockError):
     """The tag has no earlier version to roll back to."""
 
