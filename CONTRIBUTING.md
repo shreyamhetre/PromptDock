@@ -17,7 +17,7 @@ uv run mypy                # type check
 uv run pytest              # tests (DB tests start Postgres via testcontainers)
 ```
 
-Tests use Postgres 16 by default. CI runs Python 3.10–3.13 against Postgres 14 and 17;
+Tests use Postgres 16 by default. CI runs Python 3.10â€“3.13 against Postgres 14 and 17;
 to try another version locally: `PROMPTDOCK_TEST_POSTGRES_IMAGE=postgres:14 uv run pytest`.
 
 ## Workflow
