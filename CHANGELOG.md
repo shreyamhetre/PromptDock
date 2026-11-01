@@ -22,7 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Sandboxed Jinja2 rendering; `MissingVariableError` names every missing variable.
 - Cache: 60 s TTL for tag lookups, versions cached forever; last-known-good fallback
   when the database is down, optional snapshot file for cold starts.
-- `examples/app.py` and `examples/tag.py`.
+- `examples/app.py`.
 - `Client(actor=...)`: who made each change (versions, promotes, rollbacks, gates);
   defaults to the OS username, self-reported like a git author. `Client(token=...)` for
   servers that set a shared token.
@@ -32,6 +32,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optional shared token (`PROMPTDOCK_TOKEN` / `--token`); listens on 127.0.0.1 by default
   and warns when exposed without a token. Actor via the `X-Actor` header.
 - `Client(base_url=..., token=...)` server mode with the same methods as library mode.
+- CLI: `prompts list`, `versions list|show`, `promote`, `rollback`, `history`,
+  `evals push results.jsonl`, `export ./prompts`, `push ./prompts [--tag dev] [--dry-run]`;
+  `--actor` / `--reason` on writes; connects via `PROMPTDOCK_URL` or `DATABASE_URL`.
 
 ### Changed
 - Core API matches the revised plan: `create_version(..., actor=None)` saves the actor as

@@ -3,7 +3,8 @@
     python -m uv run python examples/app.py                 # demo-bot, tag prod
     python -m uv run python examples/app.py demo-bot dev    # pick prompt and tag
 
-Leave it running, move the tag from another terminal with examples/tag.py, and watch
+Leave it running, move the tag from another terminal (`promptdock promote demo-bot prod 2`
+or `promptdock rollback demo-bot prod`), and watch
 the version change within the cache TTL (10 seconds here) without restarting the app.
 Stop it with Ctrl+C. Run examples/core_flow.py first to create demo-bot.
 """

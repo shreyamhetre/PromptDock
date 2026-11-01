@@ -80,6 +80,24 @@ token: `PROMPTDOCK_TOKEN=... promptdock serve --host 0.0.0.0`. Every request exc
 `/health` must then send `Authorization: Bearer <token>`; clients pass `token=...` (or set
 `PROMPTDOCK_TOKEN`). Listening on `0.0.0.0` without a token prints a warning.
 
+## Command line
+
+The CLI connects like the client: `PROMPTDOCK_URL` (+ `PROMPTDOCK_TOKEN`) for a server,
+otherwise `DATABASE_URL`. Changes are recorded with `--actor` (default: your OS username).
+
+```bash
+promptdock export ./prompts                  # one YAML file per prompt (latest version)
+# ...edit ./prompts/support-bot.yaml...
+promptdock push ./prompts --tag dev -m "friendlier tone"   # new versions only for changed files
+promptdock evals push results.jsonl          # eval results, one JSON object per line
+promptdock promote support-bot prod 3 --reason "evals passed"
+promptdock rollback support-bot prod --reason "complaints"
+promptdock versions list support-bot
+promptdock history support-bot prod
+```
+
+`push` never overwrites anything and never moves `prod`; promote to `prod` explicitly.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
