@@ -1,16 +1,17 @@
 """The PromptDock ``Client``: one API whether you talk to Postgres or to a server."""
 
 import logging
+import os
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from promptdock.actor import default_actor
 from promptdock.backends.base import Backend
 from promptdock.cache import PromptCache
 from promptdock.config import DEFAULT_PROJECT
-from promptdock.errors import ConfigError, DatabaseUnavailableError
+from promptdock.errors import ConfigError, UnavailableError
 from promptdock.models import (
     ChatMessage,
     EvalResult,
@@ -24,10 +25,14 @@ from promptdock.models import (
 )
 from promptdock.prompt import Prompt
 
+if TYPE_CHECKING:
+    import httpx
+
 logger = logging.getLogger("promptdock")
 
 DEFAULT_CACHE_TTL_S = 60.0
 DEFAULT_CONNECT_TIMEOUT_S = 5
+TOKEN_ENV = "PROMPTDOCK_TOKEN"
 
 
 class Client:
@@ -40,7 +45,7 @@ class Client:
     Server mode (talks to a ``promptdock serve`` instance)::
 
         client = Client(base_url="https://prompts.internal", token="...")
-        # token is only needed if the server sets PROMPTDOCK_TOKEN
+        # token is only needed if the server sets one; defaults to PROMPTDOCK_TOKEN
 
     ``get_prompt`` results are cached for ``cache_ttl`` seconds (0 disables caching).
     If the database or server is unreachable, ``get_prompt`` returns the last version it
@@ -50,6 +55,7 @@ class Client:
 
     ``actor`` is recorded as who made each change (new versions, promotes, rollbacks,
     gates). It defaults to the OS username and is self-reported, like a git author.
+    ``http_client`` lets server mode use your own ``httpx.Client`` (proxies, TLS, tests).
     """
 
     def __init__(
@@ -63,19 +69,23 @@ class Client:
         cache_ttl: float = DEFAULT_CACHE_TTL_S,
         snapshot_path: str | Path | None = None,
         connect_timeout: int = DEFAULT_CONNECT_TIMEOUT_S,
+        http_client: "httpx.Client | None" = None,
     ) -> None:
         if db_url is not None and base_url is not None:
             raise ConfigError("Pass either db_url or base_url, not both")
-        if base_url is not None:
-            raise ConfigError(
-                "Server mode (base_url) is not available yet; use db_url or DATABASE_URL"
-            )
         if cache_ttl < 0:
             raise ConfigError("cache_ttl must be zero or positive")
 
-        from promptdock.backends.db import DbBackend
+        self._backend: Backend
+        if base_url is not None:
+            from promptdock.backends.http import HttpBackend
 
-        self._backend: Backend = DbBackend(db_url, connect_timeout)
+            token = token if token is not None else os.environ.get(TOKEN_ENV)
+            self._backend = HttpBackend(base_url, token, connect_timeout, http_client)
+        else:
+            from promptdock.backends.db import DbBackend
+
+            self._backend = DbBackend(db_url, connect_timeout)
         self.project = project
         self.actor = actor if actor is not None else default_actor()
         self._cache = PromptCache(cache_ttl, snapshot_path)
@@ -109,7 +119,7 @@ class Client:
                 data = self._backend.get_by_tag(self.project, name, tag)
             else:
                 data = self._backend.get_version(self.project, name, version)
-        except DatabaseUnavailableError as exc:
+        except UnavailableError as exc:
             stale = self._cache.get_stale(key)
             if stale is None:
                 raise

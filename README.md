@@ -53,6 +53,33 @@ Reads are cached for `cache_ttl` seconds (default 60). If the database is unreac
 `get_prompt` returns the last version it fetched and logs a warning; pass
 `snapshot_path="prompts.json"` to keep those copies on disk for restarts.
 
+## Quickstart (server mode)
+
+```bash
+pip install "promptdock[server]"
+promptdock migrate
+promptdock serve                      # http://127.0.0.1:8000, API docs at /docs
+```
+
+```python
+from promptdock import Client
+
+client = Client(base_url="http://127.0.0.1:8000")  # same methods as library mode
+prompt = client.get_prompt("support-bot", tag="prod")
+```
+
+Any language can call the REST API, e.g.
+`curl "http://127.0.0.1:8000/prompts/support-bot?tag=prod"`.
+
+**Who did it:** send `X-Actor: <name>` on changes (the Python client sends its `actor`,
+which defaults to your OS username). It is recorded in the history, not verified.
+
+**Securing your server:** there are no user accounts. `promptdock serve` only listens on
+this machine by default. To share it, either run it on a private network or set a shared
+token: `PROMPTDOCK_TOKEN=... promptdock serve --host 0.0.0.0`. Every request except
+`/health` must then send `Authorization: Bearer <token>`; clients pass `token=...` (or set
+`PROMPTDOCK_TOKEN`). Listening on `0.0.0.0` without a token prints a warning.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

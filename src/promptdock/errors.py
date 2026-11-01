@@ -9,8 +9,20 @@ class ConfigError(PromptDockError):
     """Configuration is missing or invalid (for example DATABASE_URL)."""
 
 
-class DatabaseUnavailableError(PromptDockError):
+class UnavailableError(PromptDockError):
+    """The database or the PromptDock server could not be reached."""
+
+
+class DatabaseUnavailableError(UnavailableError):
     """The database could not be reached."""
+
+
+class ServerUnavailableError(UnavailableError):
+    """The PromptDock server could not be reached or is failing."""
+
+
+class AuthenticationError(PromptDockError):
+    """The server requires a token and none, or the wrong one, was sent (HTTP 401)."""
 
 
 class InvalidInputError(PromptDockError, ValueError):

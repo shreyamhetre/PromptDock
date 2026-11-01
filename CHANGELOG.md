@@ -26,6 +26,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `Client(actor=...)`: who made each change (versions, promotes, rollbacks, gates);
   defaults to the OS username, self-reported like a git author. `Client(token=...)` for
   servers that set a shared token.
+- REST server (`pip install promptdock[server]`, `promptdock serve`): prompts, versions,
+  tags, gates, tag events (`/prompts/{name}/tags/{tag}/events`), evals; OpenAPI docs at
+  `/docs`; `ETag`/304 on the prompt fetch endpoint.
+- Optional shared token (`PROMPTDOCK_TOKEN` / `--token`); listens on 127.0.0.1 by default
+  and warns when exposed without a token. Actor via the `X-Actor` header.
+- `Client(base_url=..., token=...)` server mode with the same methods as library mode.
 
 ### Changed
 - Core API matches the revised plan: `create_version(..., actor=None)` saves the actor as

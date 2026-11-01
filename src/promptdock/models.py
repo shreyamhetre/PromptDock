@@ -158,3 +158,26 @@ class EvalResult(_Model):
     evaluator: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
+
+
+# --- request bodies for the REST API (shared by the server and the HTTP backend) -------
+# The actor is not part of any body: it travels in the X-Actor header.
+
+
+class CreatePromptRequest(_Model):
+    name: str
+    description: str | None = None
+
+
+class PromoteRequest(_Model):
+    version: int = Field(ge=1)
+    reason: str | None = None
+    force: bool = False
+
+
+class RollbackRequest(_Model):
+    reason: str | None = None
+
+
+class SetGateRequest(_Model):
+    gate: Gate | None
