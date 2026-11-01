@@ -91,8 +91,8 @@ def test_versions_auto_increment_and_extract_variables(session: Session) -> None
             ],
             model_config={"model": "gpt-4o", "temperature": 0.2},
             commit_message="switch to chat",
-            created_by="shreya",
         ),
+        actor="shreya",
     )
 
     assert (v1.version, v1.template_type, v1.variables) == (1, "text", ["name", "topic"])
@@ -178,7 +178,7 @@ def test_promote_to_current_version_is_a_no_op(session: Session) -> None:
     _with_versions(session, 1)
     service.promote(session, NAME, "prod", 1)
     service.promote(session, NAME, "prod", 1)
-    assert len(service.get_tag_history(session, NAME, "prod")) == 1
+    assert len(service.list_tag_events(session, NAME, "prod")) == 1
 
 
 def test_rollback_walks_back_like_undo(session: Session) -> None:
@@ -293,13 +293,14 @@ def test_create_eval_promote_gate_fail_rollback(session: Session) -> None:
     with pytest.raises(InvalidInputError, match="requires a reason"):
         service.promote(session, NAME, "prod", 3, actor="parth", force=True)
 
-    service.promote(session, NAME, "prod", 3, actor="parth", force=True, reason="hotfix")
+    # Plan signature: promote(name, tag, version, actor, reason, force)
+    service.promote(session, NAME, "prod", 3, "parth", "hotfix", True)
     assert service.get_by_tag(session, NAME, "prod").version == 3
 
     service.rollback(session, NAME, "prod", actor="shreya", reason="bad answers")
     assert service.get_by_tag(session, NAME, "prod").version == 2
 
-    history = service.get_tag_history(session, NAME, "prod")
+    history = service.list_tag_events(session, NAME, "prod")
     assert [(e.action, e.from_version, e.to_version, e.forced, e.actor) for e in history] == [
         ("rollback", 3, 2, False, "shreya"),
         ("promote", 2, 3, True, "parth"),
@@ -314,7 +315,7 @@ def test_force_on_passing_gate_is_not_marked_forced(session: Session) -> None:
     service.add_eval_results(session, _evals(1, accuracy=0.9))
     service.set_gate(session, NAME, "prod", Gate(rules=[GateRule(metric="accuracy", min=0.5)]))
     service.promote(session, NAME, "prod", 1, force=True, reason="just in case")
-    assert service.get_tag_history(session, NAME, "prod")[0].forced is False
+    assert service.list_tag_events(session, NAME, "prod")[0].forced is False
 
 
 def test_require_better_than_current(session: Session) -> None:
@@ -383,7 +384,7 @@ def test_concurrent_promotes_keep_history_consistent(engine: Engine) -> None:
     assert _run_concurrently(engine, jobs) == []
 
     with Session(engine) as s:
-        history = list(reversed(service.get_tag_history(s, NAME, "prod")))
+        history = list(reversed(service.list_tag_events(s, NAME, "prod")))
         assert len(history) == count
         # Each move starts where the previous one ended: no lost updates.
         assert history[0].from_version is None

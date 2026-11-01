@@ -56,7 +56,6 @@ class PromptVersionCreate(_Model):
     template: Template
     llm_config: dict[str, Any] = Field(default_factory=dict, alias="model_config")
     commit_message: str | None = None
-    created_by: str | None = None
 
     @field_validator("template")
     @classmethod

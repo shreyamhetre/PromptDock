@@ -90,7 +90,7 @@ with Session(make_engine()) as s:
     show(s, 10, f"save v3's text again: no new version (got v{same})")
 
     print("\nHistory of tag moves:")
-    for e in reversed(service.get_tag_history(s, NAME)):
+    for e in reversed(service.list_tag_events(s, NAME)):
         start = f"v{e.from_version}" if e.from_version else "(none)"
         reason = f"  reason: {e.reason}" if e.reason else ""
         print(f"  {e.tag:<8} {e.action:<9} {start:>6} -> v{e.to_version}{reason}")

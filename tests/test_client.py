@@ -90,7 +90,7 @@ def test_full_flow_through_client(client: Client) -> None:
 
     assert [r.score for r in client.get_eval_results(NAME)] == [0.9, 0.5]
     assert {t.name: t.version for t in client.list_tags(NAME)}["prod"] == 1
-    assert [e.actor for e in client.get_history(NAME, "prod")] == ["shreya"]
+    assert [e.actor for e in client.list_tag_events(NAME, "prod")] == ["shreya"]
     assert [p.name for p in client.list_prompts()] == [NAME]
     assert [v.version for v in client.list_versions(NAME)] == [1, 2]
 

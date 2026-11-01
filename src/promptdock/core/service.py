@@ -108,8 +108,9 @@ def create_version(
     name: str,
     data: PromptVersionCreate,
     project: str = DEFAULT_PROJECT,
+    actor: str | None = None,
 ) -> PromptVersion:
-    """Save a new immutable version and return it.
+    """Save a new immutable version and return it; ``actor`` is saved as ``created_by``.
 
     If the template and model_config are identical to the latest version, no new version
     is created and the latest one is returned instead.
@@ -135,7 +136,7 @@ def create_version(
         variables=variables,
         model_config=data.llm_config,
         commit_message=data.commit_message,
-        created_by=data.created_by,
+        created_by=actor,
         content_hash=content_hash,
     )
     session.add(row)
@@ -213,8 +214,8 @@ def promote(
     tag: str,
     version: int,
     actor: str | None = None,
-    force: bool = False,
     reason: str | None = None,
+    force: bool = False,
     project: str = DEFAULT_PROJECT,
 ) -> Tag:
     """Point ``tag`` at ``version``, creating custom tags on first use.
@@ -277,7 +278,7 @@ def rollback(
     return _tag_model(tag_row, name, _version_numbers(session, prompt.id))
 
 
-def get_tag_history(
+def list_tag_events(
     session: Session, name: str, tag: str | None = None, project: str = DEFAULT_PROJECT
 ) -> list[TagEvent]:
     """Return the audit log of tag moves for a prompt (newest first), optionally for one tag."""

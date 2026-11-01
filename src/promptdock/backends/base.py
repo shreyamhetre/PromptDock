@@ -25,7 +25,7 @@ class Backend(Protocol):
     def list_prompts(self, project: str) -> list[PromptInfo]: ...
 
     def create_version(
-        self, project: str, name: str, data: PromptVersionCreate
+        self, project: str, name: str, data: PromptVersionCreate, actor: str | None
     ) -> PromptVersion: ...
 
     def get_version(self, project: str, name: str, version: int | None) -> PromptVersion: ...
@@ -45,15 +45,15 @@ class Backend(Protocol):
         tag: str,
         version: int,
         actor: str | None,
-        force: bool,
         reason: str | None,
+        force: bool,
     ) -> Tag: ...
 
     def rollback(
         self, project: str, name: str, tag: str, actor: str | None, reason: str | None
     ) -> Tag: ...
 
-    def get_tag_history(self, project: str, name: str, tag: str | None) -> list[TagEvent]: ...
+    def list_tag_events(self, project: str, name: str, tag: str | None) -> list[TagEvent]: ...
 
     def add_eval_results(self, results: Sequence[EvalResultIn]) -> list[EvalResult]: ...
 

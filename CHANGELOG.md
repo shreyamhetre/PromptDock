@@ -25,6 +25,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `examples/app.py` and `examples/tag.py`.
 
 ### Changed
+- Core API matches the revised plan: `create_version(..., actor=None)` saves the actor as
+  `created_by`; `list_tag_events(name, tag)`; `promote(name, tag, version, actor, reason,
+  force)`.
 - The metadata model `Prompt` is now `PromptInfo`; `Prompt` is the renderable object.
 
 ### Removed

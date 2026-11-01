@@ -147,10 +147,9 @@ class Client:
                 "template": template,
                 "model_config": dict(model_config or {}),
                 "commit_message": commit_message,
-                "created_by": created_by,
             }
         )
-        version = self._backend.create_version(self.project, name, data)
+        version = self._backend.create_version(self.project, name, data, created_by)
         self._cache.invalidate(self._key(name, "latest"))
         return version
 
@@ -178,7 +177,7 @@ class Client:
     ) -> Tag:
         """Point ``tag`` at ``version``. Refused with ``GateFailedError`` if the tag's gate
         fails, unless ``force=True`` with a ``reason``."""
-        result = self._backend.promote(self.project, name, tag, version, actor, force, reason)
+        result = self._backend.promote(self.project, name, tag, version, actor, reason, force)
         self._cache.invalidate(self._key(name, f"tag:{tag}"))
         return result
 
@@ -196,9 +195,9 @@ class Client:
         parsed = Gate.model_validate(gate) if gate is not None else None
         return self._backend.set_gate(self.project, name, tag, parsed)
 
-    def get_history(self, name: str, tag: str | None = None) -> list[TagEvent]:
-        """Every promote and rollback for the prompt (newest first)."""
-        return self._backend.get_tag_history(self.project, name, tag)
+    def list_tag_events(self, name: str, tag: str | None = None) -> list[TagEvent]:
+        """Every promote and rollback for the prompt (newest first), optionally one tag."""
+        return self._backend.list_tag_events(self.project, name, tag)
 
     # --- eval results ---------------------------------------------------------------------
 

@@ -51,8 +51,10 @@ class DbBackend:
     def list_prompts(self, project: str) -> list[PromptInfo]:
         return self._run(lambda s: service.list_prompts(s, project))
 
-    def create_version(self, project: str, name: str, data: PromptVersionCreate) -> PromptVersion:
-        return self._run(lambda s: service.create_version(s, name, data, project))
+    def create_version(
+        self, project: str, name: str, data: PromptVersionCreate, actor: str | None
+    ) -> PromptVersion:
+        return self._run(lambda s: service.create_version(s, name, data, project, actor))
 
     def get_version(self, project: str, name: str, version: int | None) -> PromptVersion:
         return self._run(lambda s: service.get_version(s, name, version, project))
@@ -76,11 +78,11 @@ class DbBackend:
         tag: str,
         version: int,
         actor: str | None,
-        force: bool,
         reason: str | None,
+        force: bool,
     ) -> Tag:
         return self._run(
-            lambda s: service.promote(s, name, tag, version, actor, force, reason, project)
+            lambda s: service.promote(s, name, tag, version, actor, reason, force, project)
         )
 
     def rollback(
@@ -88,8 +90,8 @@ class DbBackend:
     ) -> Tag:
         return self._run(lambda s: service.rollback(s, name, tag, actor, reason, project))
 
-    def get_tag_history(self, project: str, name: str, tag: str | None) -> list[TagEvent]:
-        return self._run(lambda s: service.get_tag_history(s, name, tag, project))
+    def list_tag_events(self, project: str, name: str, tag: str | None) -> list[TagEvent]:
+        return self._run(lambda s: service.list_tag_events(s, name, tag, project))
 
     def add_eval_results(self, results: Sequence[EvalResultIn]) -> list[EvalResult]:
         return self._run(lambda s: service.add_eval_results(s, results))
